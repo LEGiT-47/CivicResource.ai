@@ -1,0 +1,15 @@
+# Global ignores
+node_modules/
+.DS_Store
+.env
+.env.local
+.vscode/
+.idea/
+__pycache__/
+*.log
+dist/
+build/
+venv/
+.venv/
+env/
+.gemini/

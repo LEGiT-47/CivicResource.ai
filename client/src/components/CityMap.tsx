@@ -84,23 +84,24 @@ export default function CityMap({ incidents }: { incidents: any[] }) {
 
           {/* Heatmap zones: The Triage Layer */}
           {showHeatmap &&
-            mockClusters.map((c) => {
-              const { x, y } = toXY(c.center.lat, c.center.lng);
-              const r = c.radius * 9000;
+            incidents.map((inc) => {
+              if(!inc.location?.lat) return null;
+              const { x, y } = toXY(inc.location.lat, inc.location.lng);
+              const severityWeight = inc.severity === "critical" ? 1.2 : inc.severity === "high" ? 0.8 : 0.4;
+              const r = severityWeight * 50; // Dynamic radius for visual heatmap
+              
               return (
-                <g key={c.id}>
+                <g key={`heat-${inc._id}`}>
                   <defs>
-                    <radialGradient id={`heat-${c.id}`}>
-                      <stop offset="0%" stopColor={c.priorityScore > 80 ? "#FF4F00" : c.priorityScore > 50 ? "#F59E0B" : "#4F46E5"} stopOpacity="0.15" />
+                    <radialGradient id={`heat-grad-${inc._id}`}>
+                      <stop offset="0%" stopColor={priorityFill[inc.severity] || "#4F46E5"} stopOpacity="0.2" />
                       <stop offset="100%" stopColor="transparent" stopOpacity="0" />
                     </radialGradient>
                   </defs>
                   <circle
                     cx={x} cy={y} r={r}
-                    fill={`url(#heat-${c.id})`}
-                    className="cursor-pointer transition-all duration-300 hover:fill-opacity-40"
-                    onMouseMove={(e) => handleClusterHover(e, c)}
-                    onMouseLeave={() => setTooltip(null)}
+                    fill={`url(#heat-grad-${inc._id})`}
+                    className="animate-pulse"
                   />
                 </g>
               );

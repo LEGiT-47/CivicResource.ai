@@ -23,11 +23,13 @@ import authRoutes from './routes/authRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import dispatchRoutes from './routes/dispatchRoutes.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/dashboard', analyticsRoutes);
+app.use('/api/dispatch', dispatchRoutes);
 
 // Middleware for errors
 app.use(notFound);

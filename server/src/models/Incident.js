@@ -26,9 +26,23 @@ const incidentSchema = mongoose.Schema(
       enum: ['active', 'investigating', 'resolved'],
       default: 'active',
     },
+    dispatchStatus: {
+      type: String,
+      enum: ['unassigned', 'dispatched', 'on-site', 'resolving', 'completed'],
+      default: 'unassigned',
+    },
+    assignedPersonnel: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Personnel',
+    },
     aiPredictionConfidence: {
       type: Number,
       default: 0,
+    },
+    impactAnalysis: {
+      growthTrend: { type: Number, default: 0 },
+      mitigationEfficiency: { type: Number, default: 0 },
+      areaStressScore: { type: Number, default: 0 },
     },
     details: {
       type: String,

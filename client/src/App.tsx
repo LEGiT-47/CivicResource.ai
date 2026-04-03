@@ -12,6 +12,8 @@ import Escalation from "./pages/Escalation";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import DispatchSystem from "./pages/DispatchSystem";
+import ReportsArchive from "./pages/ReportsArchive";
 import NotFound from "./pages/NotFound";
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -35,6 +37,8 @@ const App = () => (
             <Route path="/app" element={<AppLayout><CommandCenter /></AppLayout>} />
             <Route path="/app/intelligence" element={<AppLayout><IntelligenceHub /></AppLayout>} />
             <Route path="/app/report" element={<AppLayout><CitizenReport /></AppLayout>} />
+            <Route path="/app/dispatch" element={<AppLayout><DispatchSystem /></AppLayout>} />
+            <Route path="/app/archive" element={<AppLayout><ReportsArchive /></AppLayout>} />
             <Route path="/app/driver" element={<AppLayout><DriverHUD /></AppLayout>} />
             <Route path="/app/escalation" element={<AppLayout><Escalation /></AppLayout>} />
           </Route>

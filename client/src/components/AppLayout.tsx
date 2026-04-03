@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { 
   Map, BarChart3, FileText, Truck, AlertTriangle, 
   Menu, X, Zap, LogOut, Bell, User, Settings, ShieldCheck,
-  Search, LayoutGrid, Activity
+  Search, LayoutGrid, Activity, Send, Archive
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -11,10 +11,11 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const navItems = [
   { to: "/app", label: "Strategic Map", icon: LayoutGrid },
+  { to: "/app/dispatch", label: "Live Dispatch", icon: Send },
+  { to: "/app/archive", label: "Incident Archive", icon: Archive },
   { to: "/app/intelligence", label: "Intelligence Matrix", icon: Activity },
   { to: "/app/report", label: "Field Induction", icon: FileText },
   { to: "/app/driver", label: "Operational HUD", icon: Truck },
-  { to: "/app/escalation", label: "Governance Log", icon: AlertTriangle },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
