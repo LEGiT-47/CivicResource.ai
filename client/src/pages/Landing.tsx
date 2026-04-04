@@ -1,11 +1,11 @@
-import { useState } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Globe2, Search, FileText, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
+import { PublicLocale, usePublicLocale } from "@/lib/publicLocale";
 
-type Locale = "english" | "hindi" | "marathi";
+type Locale = PublicLocale;
 
 const copy = {
   english: {
@@ -41,11 +41,11 @@ const copy = {
 } as const;
 
 export default function Landing() {
-  const [locale, setLocale] = useState<Locale>("english");
+  const { locale, setLocale, isIndic } = usePublicLocale();
   const text = copy[locale];
 
   return (
-    <div className="min-h-screen bg-slate-50 font-inter selection:bg-primary/20">
+    <div className={cn("min-h-screen bg-slate-50 font-inter selection:bg-primary/20", isIndic && "[&_p]:text-[1.06em]") }>
       <header className="sticky top-0 z-50 border-b border-border/40 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto max-w-6xl px-6 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">

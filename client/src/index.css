@@ -101,3 +101,20 @@
 ::-webkit-scrollbar-thumb {
   @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
 }
+
+/* Increase tiny utility text sizes for Devanagari scripts. */
+:root[data-public-locale-script="indic"] .text-\[9px\] {
+  font-size: 11px;
+}
+
+:root[data-public-locale-script="indic"] .text-\[10px\] {
+  font-size: 12px;
+}
+
+:root[data-public-locale-script="indic"] .text-\[11px\] {
+  font-size: 13px;
+}
+
+:root[data-public-locale-script="indic"] .concierge-input {
+  font-size: 1rem;
+}

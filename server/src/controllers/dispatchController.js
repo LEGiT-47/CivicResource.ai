@@ -310,8 +310,8 @@ export const assignPersonnel = async (req, res) => {
       return res.status(400).json({ message: 'Personnel is already busy or off-duty' });
     }
 
-    // Assign
-    if (!incident.assignedPersonnel) {
+    // Assign current primary responder; keep historical list separately.
+    if (!incident.assignedPersonnel || incident.status === 'resolved' || incident.dispatchStatus === 'completed') {
       incident.assignedPersonnel = personnelId;
     }
 
@@ -381,7 +381,6 @@ export const getWorkerAssignmentsByUnitId = async (req, res) => {
 
     const assignedIncidents = await Incident.find({
       $or: [{ assignedPersonnel: personnel._id }, { assignedPersonnelList: personnel._id }],
-      status: { $ne: 'resolved' },
     })
       .sort({ updatedAt: -1 })
       .select('title severity status dispatchStatus trackingId location createdAt updatedAt');

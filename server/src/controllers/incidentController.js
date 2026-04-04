@@ -129,7 +129,6 @@ const inferCoordinates = (location = {}) => {
   const address = (location.address || '').toLowerCase();
   if (address.includes('andheri')) return { lat: 19.1136, lng: 72.8697 };
   if (address.includes('bandra')) return { lat: 19.0544, lng: 72.8406 };
-  if (address.includes('goregaon')) return { lat: 19.1663, lng: 72.8526 };
   if (address.includes('thane')) return { lat: 19.1176, lng: 72.906 };
 
   return COORD_FALLBACK;
@@ -502,6 +501,11 @@ export const createIncident = async (req, res, next) => {
       title: titleEnglish,
       type: triagedType,
       severity: ['low', 'medium', 'high', 'critical'].includes(severity) ? severity : 'medium',
+      status: 'active',
+      dispatchStatus: 'unassigned',
+      assignedPersonnel: null,
+      assignedPersonnelList: [],
+      assignedResources: [],
       location: locationWithCoords,
       details: detailsEnglish,
       aiPredictionConfidence: Math.max(
@@ -552,55 +556,6 @@ export const createIncident = async (req, res, next) => {
 
     let createdIncident = await incident.save();
 
-    const preferredTypesByNeed = {
-      water: ['utility'],
-      sanitation: ['sanitation', 'utility'],
-      roads: ['utility'],
-      maintenance: ['utility'],
-      utility: ['utility'],
-      infrastructure: ['utility'],
-      safety: ['police'],
-      traffic: ['police', 'utility'],
-      fire: ['fire'],
-      medical: ['medical'],
-      crime: ['police'],
-    };
-
-    const preferredTypes = preferredTypesByNeed[triagedType] || ['utility', 'sanitation', 'police', 'fire', 'medical'];
-    const availablePersonnel = await Personnel.find({ status: 'available' }).limit(250);
-    let bestCandidate = null;
-
-    for (const person of availablePersonnel) {
-      const distance = haversineKm(
-        locationWithCoords.lat,
-        locationWithCoords.lng,
-        person?.location?.lat,
-        person?.location?.lng
-      );
-      const typePenalty = preferredTypes.includes(String(person.type || '').toLowerCase()) ? 0 : 3;
-      const score = distance + typePenalty;
-      if (!bestCandidate || score < bestCandidate.score) {
-        bestCandidate = { person, distance, score };
-      }
-    }
-
-    if (bestCandidate && bestCandidate.distance <= 8) {
-      createdIncident.assignedPersonnel = bestCandidate.person._id;
-      createdIncident.assignedPersonnelList = createdIncident.assignedPersonnelList || [];
-      if (!createdIncident.assignedPersonnelList.map((id) => String(id)).includes(String(bestCandidate.person._id))) {
-        createdIncident.assignedPersonnelList.push(bestCandidate.person._id);
-      }
-      createdIncident.dispatchStatus = 'dispatched';
-      createdIncident.workflow = createdIncident.workflow || {};
-      createdIncident.workflow.allocatedAt = createdIncident.workflow.allocatedAt || new Date();
-      createdIncident.workflow.enRouteAt = createdIncident.workflow.enRouteAt || new Date();
-      createdIncident = await createdIncident.save();
-
-      bestCandidate.person.status = 'busy';
-      bestCandidate.person.currentIncident = createdIncident._id;
-      await bestCandidate.person.save();
-    }
-
     if (duplicateFusion?.duplicateIncidentId) {
       const existing = await Incident.findById(duplicateFusion.duplicateIncidentId);
       if (existing) {
@@ -645,7 +600,8 @@ export const updateIncidentStatus = async (req, res, next) => {
         incident.workflow.enRouteAt = new Date();
       }
 
-      // Closing an incident must release the assigned responder back to the available pool.
+      // Closing an incident must release the assigned responder back to the available pool,
+      // while preserving assignment references for historical views.
       if (status === 'resolved') {
         incident.dispatchStatus = 'completed';
         incident.workflow.resolvedAt = new Date();
@@ -673,10 +629,6 @@ export const updateIncidentStatus = async (req, res, next) => {
             { $set: { status: 'available', currentIncident: null } }
           );
         }
-
-        incident.assignedPersonnel = null;
-        incident.assignedPersonnelList = [];
-        incident.assignedResources = [];
       }
 
       const updatedIncident = await incident.save();
