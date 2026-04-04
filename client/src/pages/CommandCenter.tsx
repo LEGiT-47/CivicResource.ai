@@ -31,6 +31,7 @@ export default function CommandCenter() {
   const [activeTab, setActiveTab] = useState<"map" | "analysis">("map");
   const [incidents, setIncidents] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
+  const [personnel, setPersonnel] = useState<any[]>([]);
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisData, setAnalysisData] = useState<any | null>(null);
@@ -118,12 +119,14 @@ export default function CommandCenter() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [incidentsRes, resourcesRes] = await Promise.all([
+        const [incidentsRes, resourcesRes, personnelRes] = await Promise.all([
           api.get("/incidents"),
           api.get("/resources"),
+          api.get("/dispatch/personnel?all=true"),
         ]);
         setIncidents(incidentsRes.data);
         setResources(resourcesRes.data);
+        setPersonnel(personnelRes.data);
       } catch (err) {
         console.error("CommandCenter fetch failed", err);
       }
@@ -152,7 +155,7 @@ export default function CommandCenter() {
     fetchData();
     syncCrisisMode();
     runGlobalAnalysis(true);
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 4000);
     const pulseInterval = setInterval(() => runGlobalAnalysis(true), 15000);
     return () => {
       clearInterval(interval);
@@ -163,12 +166,14 @@ export default function CommandCenter() {
   const runOptimization = async () => {
     setIsOptimizing(true);
     try {
-      const [{ data: latestIncidents }, { data: latestResources }] = await Promise.all([
+      const [{ data: latestIncidents }, { data: latestResources }, { data: latestPersonnel }] = await Promise.all([
         api.get("/incidents"),
         api.get("/resources"),
+        api.get("/dispatch/personnel?all=true"),
       ]);
       setIncidents(latestIncidents);
       setResources(latestResources);
+      setPersonnel(latestPersonnel);
       await runGlobalAnalysis(true);
       toast.success("Optimization cycle completed");
     } catch (err) {
@@ -275,6 +280,7 @@ export default function CommandCenter() {
                   <CityMap
                     incidents={incidents}
                     resources={operationalResources}
+                    personnel={personnel}
                     selectedIncidentId={selectedIncidentId}
                     onIncidentSelect={setSelectedIncidentId}
                   />

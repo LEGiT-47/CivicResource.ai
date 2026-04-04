@@ -206,12 +206,12 @@ const seedData = async () => {
     ]);
 
     const baseResources = await Resource.create([
-      { name: 'Water Tanker WT-17', type: 'public_works', status: 'dispatched', location: { lat: 19.05, lng: 72.86 }, currentIncident: incidents[0]._id, batteryOrFuelLevel: 78 },
-      { name: 'Garbage Truck GT-22', type: 'public_works', status: 'dispatched', location: { lat: 19.11, lng: 72.87 }, currentIncident: incidents[1]._id, batteryOrFuelLevel: 70 },
-      { name: 'Fire Tender FT-04', type: 'fire', status: 'dispatched', location: { lat: 19.08, lng: 72.88 }, currentIncident: incidents[5]._id, batteryOrFuelLevel: 82 },
+      { name: 'Water Tanker WT-17', type: 'public_works', status: 'patrol', location: { lat: 19.05, lng: 72.86 }, batteryOrFuelLevel: 78 },
+      { name: 'Garbage Truck GT-22', type: 'public_works', status: 'patrol', location: { lat: 19.11, lng: 72.87 }, batteryOrFuelLevel: 70 },
+      { name: 'Fire Tender FT-04', type: 'fire', status: 'patrol', location: { lat: 19.08, lng: 72.88 }, batteryOrFuelLevel: 82 },
       { name: 'Drone Recon X1', type: 'drone', status: 'patrol', location: { lat: 19.07, lng: 72.90 }, batteryOrFuelLevel: 62 },
       { name: 'Patrol 14', type: 'police', status: 'patrol', location: { lat: 19.02, lng: 72.85 }, batteryOrFuelLevel: 90 },
-      { name: 'Ambulance AMB-09', type: 'medical', status: 'dispatched', location: { lat: 19.02, lng: 72.85 }, currentIncident: incidents[8]._id, batteryOrFuelLevel: 76 },
+      { name: 'Ambulance AMB-09', type: 'medical', status: 'patrol', location: { lat: 19.02, lng: 72.85 }, batteryOrFuelLevel: 76 },
       { name: 'Road Repair Unit RR-31', type: 'public_works', status: 'maintenance', location: { lat: 19.09, lng: 72.89 }, batteryOrFuelLevel: 68 },
       { name: 'Public Works Van PW-08', type: 'public_works', status: 'patrol', location: { lat: 19.13, lng: 72.84 }, batteryOrFuelLevel: 88 }
     ]);
@@ -276,87 +276,44 @@ const seedData = async () => {
       { title: 'Roadside debris obstructing tanker routes', type: 'infrastructure', severity: 'high', location: { lat: 19.02, lng: 72.872, address: 'Lower Parel Connector, Mumbai' }, aiPredictionConfidence: 83 }
     ]);
 
-    // Assign at least one incident to every worker with mixed states
-    // Worker 1 (ongoing)
-    incidents[0].assignedPersonnel = personnel[0]._id;
-    incidents[0].dispatchStatus = 'dispatched';
-    incidents[0].status = 'investigating';
-    personnel[0].status = 'busy';
-    personnel[0].currentIncident = incidents[0]._id;
+    // Reset seed to a neutral dispatch state:
+    // active incidents are mostly unassigned, while a few resolved incidents remain for realism.
+    const allIncidents = [...incidents, ...extraIncidents];
+    const resolvedIncidentIndexes = new Set([1, 4, 9, 15]);
 
-    // Worker 2 (resolved/inactive) so police has at least one available responder for new Public Safety dispatches
-    incidents[1].assignedPersonnel = personnel[1]._id;
-    incidents[1].dispatchStatus = 'completed';
-    incidents[1].status = 'resolved';
-    personnel[1].status = 'available';
-    personnel[1].currentIncident = null;
+    allIncidents.forEach((incident, idx) => {
+      incident.assignedPersonnel = null;
+      incident.assignedPersonnelList = [];
+      incident.assignedResources = [];
+      incident.workflow = incident.workflow || {};
 
-    // Worker 3 (ongoing)
-    incidents[2].assignedPersonnel = personnel[2]._id;
-    incidents[2].dispatchStatus = 'dispatched';
-    incidents[2].status = 'investigating';
-    personnel[2].status = 'busy';
-    personnel[2].currentIncident = incidents[2]._id;
+      if (resolvedIncidentIndexes.has(idx)) {
+        incident.status = 'resolved';
+        incident.dispatchStatus = 'completed';
+        incident.workflow.resolvedAt = new Date();
+        incident.outcomeLearning = {
+          actualResolutionMinutes: 95,
+          success: true,
+          citizenRating: 4,
+          followUpNotes: 'Seeded resolved sample for normal dashboard history.',
+          recordedAt: new Date(),
+          usedForTraining: true,
+        };
+      } else {
+        incident.status = 'active';
+        incident.dispatchStatus = 'unassigned';
+      }
+    });
 
-    // Worker 4 (resolved/inactive)
-    incidents[3].assignedPersonnel = personnel[3]._id;
-    incidents[3].dispatchStatus = 'completed';
-    incidents[3].status = 'resolved';
-    personnel[3].status = 'available';
-    personnel[3].currentIncident = null;
+    [...personnel, ...extraPersonnel].forEach((worker) => {
+      worker.status = 'available';
+      worker.currentIncident = null;
+    });
 
-    // Worker 5 (ongoing)
-    incidents[4].assignedPersonnel = personnel[4]._id;
-    incidents[4].dispatchStatus = 'resolving';
-    incidents[4].status = 'investigating';
-    personnel[4].status = 'busy';
-    personnel[4].currentIncident = incidents[4]._id;
-
-    // Worker 6 (resolved/inactive)
-    incidents[5].assignedPersonnel = personnel[5]._id;
-    incidents[5].dispatchStatus = 'completed';
-    incidents[5].status = 'resolved';
-    personnel[5].status = 'off-duty';
-    personnel[5].currentIncident = null;
-
-    // Worker 7 (ongoing)
-    incidents[6].assignedPersonnel = personnel[6]._id;
-    incidents[6].dispatchStatus = 'dispatched';
-    incidents[6].status = 'active';
-    personnel[6].status = 'busy';
-    personnel[6].currentIncident = incidents[6]._id;
-
-    // Worker 8 (resolved/inactive)
-    incidents[7].assignedPersonnel = personnel[7]._id;
-    incidents[7].dispatchStatus = 'completed';
-    incidents[7].status = 'resolved';
-    personnel[7].status = 'available';
-    personnel[7].currentIncident = null;
-
-    // Worker 9 (ongoing)
-    incidents[8].assignedPersonnel = personnel[8]._id;
-    incidents[8].dispatchStatus = 'on-site';
-    incidents[8].status = 'investigating';
-    personnel[8].status = 'busy';
-    personnel[8].currentIncident = incidents[8]._id;
-
-    // Worker 10 (ongoing)
-    incidents[10].assignedPersonnel = personnel[9]._id;
-    incidents[10].dispatchStatus = 'dispatched';
-    incidents[10].status = 'investigating';
-    personnel[9].status = 'busy';
-    personnel[9].currentIncident = incidents[10]._id;
-
-    // Keep queue for admin dispatch demo
-    incidents[9].dispatchStatus = 'unassigned';
-    incidents[11].dispatchStatus = 'unassigned';
-    incidents[12].dispatchStatus = 'unassigned';
-    incidents[13].dispatchStatus = 'unassigned';
-
-    // Save all updates
     await Promise.all([
-      ...incidents.map(i => i.save()),
-      ...personnel.map(p => p.save())
+      ...allIncidents.map((incident) => incident.save()),
+      ...personnel.map((worker) => worker.save()),
+      ...extraPersonnel.map((worker) => worker.save()),
     ]);
 
     const totalIncidentCount = incidents.length + extraIncidents.length;

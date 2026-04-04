@@ -110,6 +110,7 @@ class DemandZone(BaseModel):
     event_factor: float = Field(ge=0)
     historical_daily_avg: float = Field(ge=0)
     dominant_need: str = "general"
+    freshness_factor: float = 1.0
 
 
 class DemandForecastRequest(BaseModel):
@@ -597,6 +598,7 @@ def score_zones(zones: List[DemandZone]):
             + zone.complaints_last_7d * 0.3
             + zone.event_factor * 8
             + max(0, zone.weather_rain_mm - 6) * 0.6
+            + max(0.85, min(1.4, getattr(zone, "freshness_factor", 1.0))) * 5.5
         )
 
         recommended_units = max(1, int(round(urgency / 8)))

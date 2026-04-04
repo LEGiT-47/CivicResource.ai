@@ -444,7 +444,8 @@ export const createIncident = async (req, res, next) => {
       },
     };
 
-    const triagedType = normalizeType(aiTriage.predicted_type || aiTriage.resource_family || normalizedType);
+    const aiPredictedType = normalizeType(aiTriage.predicted_type || aiTriage.resource_family || normalizedType);
+    const triagedType = normalizedType !== 'general' ? normalizedType : aiPredictedType;
     const shouldRejectComplaint = Boolean(isPublicSubmission && aiTriage.is_fake);
 
     if (shouldRejectComplaint) {
@@ -605,6 +606,14 @@ export const updateIncidentStatus = async (req, res, next) => {
       if (status === 'resolved') {
         incident.dispatchStatus = 'completed';
         incident.workflow.resolvedAt = new Date();
+        incident.tracking = incident.tracking || {};
+        incident.tracking.currentLocation = {
+          ...(incident.tracking.currentLocation || {}),
+          etaMinutes: 0,
+          etaSeconds: 0,
+          etaUpdatedAt: new Date(),
+          phase: 'resolved',
+        };
 
         const resolvedAtTs = incident.workflow.resolvedAt || new Date();
         const actualResolutionMinutes = Math.max(1, Math.round((resolvedAtTs.getTime() - new Date(incident.createdAt).getTime()) / 60000));

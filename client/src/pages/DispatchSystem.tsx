@@ -13,6 +13,7 @@ import { toast } from "sonner";
 export default function DispatchSystem() {
   const [incidents, setIncidents] = useState<any[]>([]);
     const [resources, setResources] = useState<any[]>([]);
+        const [personnel, setPersonnel] = useState<any[]>([]);
         const [aiPulse, setAiPulse] = useState<any | null>(null);
         const [isApplyingPlan, setIsApplyingPlan] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
@@ -28,12 +29,14 @@ export default function DispatchSystem() {
 
     const fetchData = async () => {
         try {
-                        const [incRes, resourceRes] = await Promise.all([
+                        const [incRes, resourceRes, personnelRes] = await Promise.all([
                 api.get('/incidents'),
-                api.get('/resources')
+                api.get('/resources'),
+                api.get('/dispatch/personnel?all=true')
             ]);
             setIncidents((incRes.data || []).filter((i: any) => i.status !== 'resolved'));
             setResources(resourceRes.data || []);
+            setPersonnel(personnelRes.data || []);
         } catch (err) {
             console.error("Dispatch fetch failed", err);
             toast.error("Unable to sync dispatch data");
@@ -64,7 +67,7 @@ export default function DispatchSystem() {
   useEffect(() => {
     fetchData();
         fetchAiPulse(true);
-    const interval = setInterval(fetchData, 10000);
+    const interval = setInterval(fetchData, 4000);
         const pulseInterval = setInterval(() => fetchAiPulse(true), 15000);
         return () => {
             clearInterval(interval);
@@ -110,11 +113,36 @@ export default function DispatchSystem() {
         return `${Math.round(lat * 10) / 10}_${Math.round(lng * 10) / 10}`;
     };
 
-    const liveSuggestions = useMemo(() => {
-        if (!aiPulse?.allocationPlan?.length) return [];
+    const incidentFamily = (incident: any) => {
+        const text = `${incident?.type || ''} ${incident?.title || ''} ${incident?.details || ''}`.toLowerCase();
+        if (/(water|tanker|pipe|leak|hydrant|flood|drain|sewer)/.test(text)) return 'water';
+        if (/(garbage|trash|waste|sanitation|litter|dump)/.test(text)) return 'garbage';
+        if (/(road|pothole|street|bridge|traffic|signal|maintenance)/.test(text)) return 'maintenance';
+        if (/(fire|crime|unsafe|hazard|assault|police)/.test(text)) return 'safety';
+        return 'general';
+    };
 
-        const civicServiceTypes = new Set(['sanitation', 'water', 'roads', 'maintenance', 'utility', 'infrastructure', 'traffic']);
-        const unresolved = incidents.filter((i: any) => i.status !== 'resolved' && civicServiceTypes.has(String(i.type || '').toLowerCase()));
+    const distanceKm = (a: any, b: any) => {
+        const lat1 = Number(a?.lat);
+        const lng1 = Number(a?.lng);
+        const lat2 = Number(b?.lat);
+        const lng2 = Number(b?.lng);
+        if (![lat1, lng1, lat2, lng2].every(Number.isFinite)) return Number.POSITIVE_INFINITY;
+
+        const toRad = (v: number) => (Math.PI / 180) * v;
+        const R = 6371;
+        const dLat = toRad(lat2 - lat1);
+        const dLng = toRad(lng2 - lng1);
+        const h =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    };
+
+    const liveSuggestions = useMemo(() => {
+        const unresolved = incidents.filter((i: any) => i.status !== 'resolved');
+        if (!unresolved.length) return [];
+
         const incidentsByZone = unresolved.reduce((acc: Record<string, any[]>, incident: any) => {
             const key = zoneIdForIncident(incident);
             if (!key) return acc;
@@ -128,14 +156,126 @@ export default function DispatchSystem() {
             return acc;
         }, {});
 
-        return aiPulse.allocationPlan
+        const fallbackResources = resources.filter((resource: any) => {
+            const status = String(resource?.status || '').toLowerCase();
+            return status === 'available' || status === 'patrol' || status === 'dispatched';
+        });
+
+        const basePlan = aiPulse?.allocationPlan?.length ? aiPulse.allocationPlan : fallbackResources.map((resource: any, index: number) => {
+            const targetIncident = [...unresolved].sort((a: any, b: any) => {
+                const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+                const aFamily = incidentFamily(a);
+                const bFamily = incidentFamily(b);
+                const resourceFamily = incidentFamily({ type: resource.type, title: resource.name, details: '' });
+                const aMatch = aFamily === resourceFamily ? 3 : aFamily !== 'general' ? 1 : 0;
+                const bMatch = bFamily === resourceFamily ? 3 : bFamily !== 'general' ? 1 : 0;
+                const aFresh = new Date(a?.createdAt || 0).getTime();
+                const bFresh = new Date(b?.createdAt || 0).getTime();
+
+                return (
+                    bMatch - aMatch ||
+                    (severityOrder[b?.severity] || 0) - (severityOrder[a?.severity] || 0) ||
+                    bFresh - aFresh
+                );
+            })[0];
+
+            return targetIncident ? {
+                zone_id: zoneIdForIncident(targetIncident),
+                resource_id: resource._id,
+                resource_type: resource.type,
+                resource_name: resource.name,
+                resource_family: incidentFamily({ type: resource.type, title: resource.name, details: '' }),
+                preferred_family: incidentFamily(targetIncident),
+                distance_km: Number(distanceKm(resource?.location, targetIncident?.location).toFixed(2)),
+                eta_minutes: Math.max(3, Math.round(distanceKm(resource?.location, targetIncident?.location) / 0.45)),
+                urgency_score: Math.max(1, 30 - index),
+                ranking_score: Math.max(60, 90 - index * 4),
+                explainability: {
+                    score: Math.max(60, 90 - index * 4),
+                    why: [
+                        'Live fallback generated from active incidents because the AI plan returned no allocations',
+                        `Prioritized ${targetIncident.title}`,
+                    ],
+                    factors: {
+                        urgency: 100,
+                        eta: 100,
+                        familyMatch: 100,
+                        severity: 100,
+                        learningConfidence: 0,
+                    },
+                },
+                route_factors: {
+                    trafficIndex: 1,
+                    roadConditionIndex: 1,
+                },
+                pinned: index === 0,
+            } : null;
+        }).filter(Boolean);
+
+        if (!basePlan.length) {
+            const newestIncidentOnly = [...unresolved].sort((a: any, b: any) => {
+                const aFresh = new Date(a?.createdAt || 0).getTime();
+                const bFresh = new Date(b?.createdAt || 0).getTime();
+                return bFresh - aFresh;
+            })[0];
+
+            if (newestIncidentOnly) {
+                basePlan.push({
+                    zone_id: zoneIdForIncident(newestIncidentOnly),
+                    resource_id: `pending-${newestIncidentOnly._id}`,
+                    resource_fallback: {
+                        _id: `pending-${newestIncidentOnly._id}`,
+                        name: 'Awaiting Available Unit',
+                        type: 'pending',
+                        status: 'offline',
+                        location: newestIncidentOnly.location,
+                    },
+                    resource_type: 'pending',
+                    resource_name: 'Awaiting Available Unit',
+                    resource_family: 'general',
+                    preferred_family: incidentFamily(newestIncidentOnly),
+                    distance_km: 0,
+                    eta_minutes: null,
+                    urgency_score: 99,
+                    ranking_score: 99,
+                    explainability: {
+                        score: 99,
+                        why: ['Active incident is queued and visible while all units are currently unavailable'],
+                        factors: { urgency: 100, eta: 0, familyMatch: 0, severity: 100, learningConfidence: 0 },
+                    },
+                    route_factors: { trafficIndex: 1, roadConditionIndex: 1 },
+                    pinned: true,
+                });
+            }
+        }
+
+        const suggestions = basePlan
             .map((allocation: any) => {
-                const resource = resourceById[String(allocation.resource_id)];
+                const resource = resourceById[String(allocation.resource_id)] || allocation.resource_fallback;
                 const inZone = incidentsByZone[String(allocation.zone_id)] || [];
-                const targetIncident = inZone.sort((a: any, b: any) => {
-                    const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
-                    return (severityOrder[b?.severity] || 0) - (severityOrder[a?.severity] || 0);
-                })[0];
+                const preferredFamily = String(allocation.preferred_family || allocation.resource_family || 'general').toLowerCase();
+                const targetIncident = [...inZone]
+                    .sort((a: any, b: any) => {
+                        const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+                        const aFamily = incidentFamily(a);
+                        const bFamily = incidentFamily(b);
+                        const aMatch = aFamily === preferredFamily ? 3 : aFamily !== 'general' ? 1 : 0;
+                        const bMatch = bFamily === preferredFamily ? 3 : bFamily !== 'general' ? 1 : 0;
+                        const aFresh = new Date(a?.createdAt || 0).getTime();
+                        const bFresh = new Date(b?.createdAt || 0).getTime();
+
+                        return (
+                            bMatch - aMatch ||
+                            (severityOrder[b?.severity] || 0) - (severityOrder[a?.severity] || 0) ||
+                            bFresh - aFresh
+                        );
+                    })[0] ||
+                [...unresolved]
+                    .sort((a: any, b: any) => {
+                        const ra = distanceKm(resource?.location, a?.location);
+                        const rb = distanceKm(resource?.location, b?.location);
+                        return ra - rb;
+                    })[0];
 
                 if (!resource || !targetIncident) return null;
                 return {
@@ -152,23 +292,59 @@ export default function DispatchSystem() {
                     resourceFamily: allocation.resource_family,
                 };
             })
-            .filter(Boolean)
-            .slice(0, 6);
+            .filter(Boolean);
+
+        const newestIncident = [...unresolved].sort((a: any, b: any) => {
+            const aFresh = new Date(a?.createdAt || 0).getTime();
+            const bFresh = new Date(b?.createdAt || 0).getTime();
+            return bFresh - aFresh;
+        })[0];
+
+        if (newestIncident && !suggestions.some((item: any) => item.incident?._id === newestIncident._id)) {
+            const topResource = resourceById[String(basePlan[0]?.resource_id)] || fallbackResources[0];
+            if (topResource) {
+                suggestions.unshift({
+                    resource: topResource,
+                    incident: newestIncident,
+                    eta: basePlan[0]?.eta_minutes,
+                    predictedTravel: basePlan[0]?.predicted_travel_time_minutes || basePlan[0]?.eta_minutes,
+                    routeFactors: basePlan[0]?.route_factors || { trafficIndex: 1, roadConditionIndex: 1 },
+                    rankingScore: Math.max(100, Number(basePlan[0]?.ranking_score || 0)),
+                    zone: zoneIdForIncident(newestIncident),
+                    urgency: Number(basePlan[0]?.urgency_score || 0),
+                    explainability: basePlan[0]?.explainability || {
+                        score: 100,
+                        why: ['Newest active incident pinned for live response'],
+                        factors: { urgency: 100, eta: 100, familyMatch: 100, severity: 100, learningConfidence: 0 },
+                    },
+                    preferredFamily: basePlan[0]?.preferred_family || incidentFamily(newestIncident),
+                    resourceFamily: basePlan[0]?.resource_family || topResource.type,
+                    pinned: true,
+                });
+            }
+        }
+
+        return suggestions.slice(0, 6);
     }, [aiPulse, incidents, resources]);
 
     const applyLivePlan = async () => {
-        if (!liveSuggestions.length) {
-            toast.error('No live allocation suggestions available');
-            return;
-        }
-
         setIsApplyingPlan(true);
         try {
-            for (const suggestion of liveSuggestions.slice(0, 3)) {
-                await api.put(`/resources/${suggestion.resource._id}/dispatch`, { incidentId: suggestion.incident._id });
-            }
+            const { data } = await api.post('/dispatch/apply-plan-live', {
+                liveInputs: {
+                    weather_rain_mm: 6,
+                    event_factor: 1.15,
+                    population_density_boost: 1.05,
+                },
+                maxAssignments: 3,
+            });
             await Promise.all([fetchData(), fetchAiPulse(true)]);
-            toast.success('Live plan applied to top priority zones');
+            const appliedCount = Number(data?.summary?.appliedCount || 0);
+            if (appliedCount > 0) {
+                toast.success(`Live plan applied to ${appliedCount} incident(s)`);
+            } else {
+                toast.info(data?.message || 'No suitable live allocations available');
+            }
         } catch (err) {
             console.error(err);
             toast.error('Failed to apply live plan');
@@ -376,7 +552,7 @@ export default function DispatchSystem() {
       <div className="flex-1 flex flex-col min-w-0">
                  <div className="p-8 border-b border-border/40 bg-white">
                         <div className="h-[620px] rounded-3xl overflow-hidden border border-border/40">
-                            <CityMap incidents={[...incidents, ...(selectedIncident ? [selectedIncident] : [])]} resources={operationalResources} />
+                            <CityMap incidents={[...incidents, ...(selectedIncident ? [selectedIncident] : [])]} resources={operationalResources} personnel={personnel} />
                         </div>
 
                         <AnimatePresence>
@@ -430,7 +606,7 @@ export default function DispatchSystem() {
                             </div>
 
                             {liveSuggestions.length === 0 ? (
-                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No live recommendations yet. Run refresh to generate optimization.</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No usable resources are online right now.</p>
                             ) : (
                                 <div className="space-y-2">
                                     {liveSuggestions.map((s: any) => (
@@ -465,9 +641,10 @@ export default function DispatchSystem() {
                                             </div>
                                             <button
                                                 onClick={() => handleResourceDispatch(s.resource._id, s.incident._id)}
+                                                disabled={String(s.resource?.type || '').toLowerCase() === 'pending'}
                                                 className="px-3 py-2 rounded-lg border border-border/40 text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-primary hover:text-primary transition-all"
                                             >
-                                                Apply
+                                                {String(s.resource?.type || '').toLowerCase() === 'pending' ? 'Queued' : 'Apply'}
                                             </button>
                                         </div>
                                     ))}

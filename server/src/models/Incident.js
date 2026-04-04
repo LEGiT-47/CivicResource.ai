@@ -117,6 +117,38 @@ const incidentSchema = mongoose.Schema(
       enRouteAt: { type: Date },
       resolvedAt: { type: Date },
     },
+    tracking: {
+      currentLocation: {
+        lat: { type: Number },
+        lng: { type: Number },
+        at: { type: Date },
+        phase: { type: String },
+        speedKmph: { type: Number },
+        etaMinutes: { type: Number },
+        etaSeconds: { type: Number },
+        etaUpdatedAt: { type: Date },
+      },
+      path: [
+        {
+          lat: { type: Number },
+          lng: { type: Number },
+          at: { type: Date },
+          phase: { type: String },
+          speedKmph: { type: Number },
+          etaMinutes: { type: Number },
+          etaSeconds: { type: Number },
+          etaUpdatedAt: { type: Date },
+        },
+      ],
+      events: [
+        {
+          phase: { type: String },
+          message: { type: String },
+          at: { type: Date },
+          meta: { type: mongoose.Schema.Types.Mixed },
+        },
+      ],
+    },
     outcomeLearning: {
       actualResolutionMinutes: { type: Number },
       success: { type: Boolean },

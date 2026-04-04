@@ -1,142 +1,152 @@
 # CivicResource.ai
 
-AI-assisted civic operations platform for complaint intake, dispatch orchestration, and field execution.
+CivicResource.ai is an AI-assisted civic operations platform that connects complaint intake, dispatch intelligence, and field execution in one operational flow.
 
-It combines three connected surfaces:
+It combines:
 
-1. Web control system for admin and operations teams.
-2. Mobile app for citizens and field workers.
-3. AI engine for demand analysis and optimization suggestions.
+1. A web command system for admins and dispatch teams.
+2. A worker operational HUD for route execution and status updates.
+3. A mobile app for citizen reporting and field use cases.
+4. A Python AI engine for triage, demand forecasting, and allocation support.
 
-## What This Project Solves
+## Problem It Solves
 
-City operations teams usually work with fragmented tools and delayed communication loops. CivicResource.ai creates one operational flow:
+City response teams often work with delayed updates, fragmented tools, and no shared real-time field context. This platform unifies the lifecycle:
 
-1. Citizen raises issue.
-2. Admin triages and dispatches the right worker type.
-3. Worker executes in field with a tactical HUD.
-4. System tracks lifecycle from unassigned to resolved.
+1. Complaint is reported.
+2. Incident is triaged and validated.
+3. Dispatch allocates the right responder.
+4. Worker route and progress are tracked live.
+5. Resolution and learning feedback update future decisions.
 
-## Core Features
+## Major Capabilities
 
-### Citizen Experience
+### Complaint Intake and Trust
 
-1. Complaint filing with multilingual input support.
-2. Tracking by phone or tracking ID.
-3. Offline queue and auto-sync when network is back.
+1. Multilingual complaint intake with normalization support.
+2. AI-assisted complaint triage and civic relevance checks.
+3. Trust score and verification mode assignment.
+4. Duplicate/fusion clustering for repeated reports.
+5. Public tracking via phone or tracking ID.
 
-### Admin Experience (Web)
+### AI and Optimization
 
-1. Live command center with map and feeds.
-2. Dispatch system with type-safe worker assignment.
-3. Incident archive and operational analytics.
+1. Demand forecasting and zone urgency scoring.
+2. Crisis mode templates (normal, flood, festival, strike, heatwave).
+3. Explainable allocation suggestions with scoring factors.
+4. Freshness-aware demand weighting so new incidents are prioritized.
+5. Open-data training pipeline using civic datasets.
 
-### Worker Experience (Web + Mobile)
+### Dispatch and Operations
 
-1. Assignment-focused operational HUD.
-2. Workflow actions: initialize route, resolve incident.
-3. Tactical map with coordinates, route polyline, and nearby risk markers (web HUD).
-4. Mobile assignment loading from logged-in account, with optional Unit ID fallback.
+1. Live dispatch panel with dynamic apply-plan flow.
+2. Smart fallback recommendations when AI plan is temporarily empty.
+3. Assignment history preserved after resolution.
+4. Worker-specific assignment feeds.
+5. Operator copilot command endpoint for quick decision support.
+
+### Live Worker Journey Simulation
+
+1. Scripted route lifecycle: accept, en-route, on-site, resolving, return.
+2. Shared tracking telemetry (path, events, current location) stored on incidents.
+3. Same tracking path rendered on worker and admin strategic maps.
+4. Countdown ETA in mm:ss format with seconds-level updates.
+5. Outbound ETA starts with a planned value between 11 and 20 minutes by default.
+6. If worker marks resolved early, simulation fast-forwards to completion and releases unit.
 
 ## Tech Stack
 
-### Web Client
+### Client (Web)
 
-1. React 18 + Vite + TypeScript
-2. Tailwind CSS + Framer Motion
-3. React Leaflet for maps
+1. React 18
+2. TypeScript
+3. Vite
+4. Tailwind CSS
+5. Framer Motion
+6. React Leaflet
 
-### Backend
+### Server
 
-1. Node.js + Express
-2. MongoDB + Mongoose
-3. JWT auth + bcrypt password hashing
-
-### Mobile App
-
-1. Expo + React Native + TypeScript
-2. AsyncStorage, NetInfo, local notifications
+1. Node.js
+2. Express
+3. MongoDB + Mongoose
+4. JWT authentication
 
 ### AI Engine
 
-1. FastAPI (Python)
-2. Forecasting and allocation endpoints consumed by web dashboard
+1. FastAPI
+2. scikit-learn-based triage and demand services
 
-## Repository Structure
+### Mobile App
 
-1. client: Web application
-2. server: REST API, auth, incident/dispatch logic, seeding
-3. mobile-app: Citizen + worker mobile app
-4. ai-engine: Python AI services
-5. prd.md: Product requirements and vision
+1. Expo
+2. React Native
+3. TypeScript
 
-## Quick Start
+## Repository Layout
+
+1. client: web UI and operational dashboards
+2. server: API routes, business logic, simulation scripts, seeders
+3. ai-engine: AI services, training scripts, and model assets
+4. mobile-app: mobile workflows for citizen and field usage
+5. prd.md: product requirements and system goals
+
+## Local Setup
 
 ### Prerequisites
 
 1. Node.js 18+
 2. Python 3.10+
-3. MongoDB (Atlas or local)
-4. Android Studio (for mobile emulator)
+3. MongoDB
 
-### Install
+### Install Dependencies
 
-1. Install web dependencies in client.
-2. Install backend dependencies in server.
-3. Install mobile dependencies in mobile-app.
-4. Install Python dependencies in ai-engine.
+1. In server: npm install
+2. In client: npm install
+3. In mobile-app: npm install
+4. In ai-engine: pip install -r requirements.txt
 
-### Configure
+### Run Services
 
-1. Set server environment values in server/.env.
-2. Set mobile environment values in mobile-app/.env.
-3. Ensure API and AI URLs are reachable from emulator/device.
+Use separate terminals:
 
-### Seed Data
+1. server: npm run dev
+2. client: npm run dev
+3. ai-engine: uvicorn main:app --reload --port 8000
+4. mobile-app (optional): npm run start
 
-Run seeding from server to create users, personnel, incidents, resources, and analytics.
+### Seed Demo Data
 
-Important seeded users include:
+1. In server: npm run seed
+2. Seed includes admin/operator/worker accounts, personnel, incidents, and resources.
 
-1. admin@civicflow.ai
-2. operator@civicflow.ai
-3. worker1@civicflow.ai through worker10@civicflow.ai
+## Demo Flow (Judge Friendly)
 
-## Run Locally
+1. Log in as admin and create a fresh complaint.
+2. Assign responder from dispatch.
+3. Confirm incident is assigned but not yet moving.
+4. Log in as worker and click Initialize Route.
+5. Show mm:ss ETA countdown and moving unit on worker HUD.
+6. Show the same unit path and phase on admin strategic map.
+7. Mark incident resolved from worker view to trigger fast completion.
+8. Confirm dispatch status completed and responder returned to available.
 
-Run these services in parallel:
+## API Highlights
 
-1. server: backend API
-2. ai-engine: Python AI service
-3. client: web app
-4. mobile-app: Expo app (optional if demoing mobile)
+1. POST /api/incidents: create incident
+2. PUT /api/incidents/:id/status: status transitions and resolution handling
+3. POST /api/dispatch/assign: manual responder assignment
+4. POST /api/dispatch/apply-plan-live: dynamic live dispatch application
+5. POST /api/dispatch/start-journey-simulation: worker route simulation start
+6. GET /api/dispatch/my-assignments: worker live assignments
+7. GET /api/dispatch/personnel?all=true: admin personnel view with live incident tracking
 
-## End-to-End Flow
+## Notes
 
-1. Citizen submits complaint.
-2. Complaint appears in admin dispatch queue.
-3. Admin assigns compatible worker type.
-4. Worker sees assignment and starts execution.
-5. Worker resolves incident.
-6. Admin views updated status and history.
-
-## Security and Access
-
-1. Protected web routes require valid token.
-2. Role-based behavior for admin/operator/responder.
-3. Worker assignment endpoint is scoped to logged-in worker account.
-
-## Demo Notes (Hackathon Friendly)
-
-1. Keep seeded data fresh by running server seed before demo.
-2. Use one browser session for admin and another for worker.
-3. Demonstrate full lifecycle with one incident from creation to closure.
-4. Show tactical map during worker step for field situational awareness.
-
-## Documentation for Team
-
-For deeper onboarding and architecture details, read TEAMMATE_GUIDE.md at project root.
+1. For demo consistency, reseed before major presentations.
+2. Use two browser sessions: one admin, one worker.
+3. The worker and admin maps now consume shared tracking telemetry for route sync.
 
 ## License
 
-Internal project / competition submission usage unless otherwise specified.
+Internal project and competition usage unless specified otherwise.

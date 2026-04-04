@@ -11,6 +11,25 @@ import { toast } from "sonner";
 import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { LatLngExpression } from "leaflet";
 
+const haversineKm = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+   const toRad = (v: number) => (Math.PI / 180) * v;
+   const R = 6371;
+   const dLat = toRad(bLat - aLat);
+   const dLng = toRad(bLng - aLng);
+   const aa =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+   return 2 * R * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+};
+
+const formatCountdown = (seconds: number) => {
+   if (!Number.isFinite(seconds)) return '--:--';
+   const total = Math.max(0, Math.round(seconds));
+   const minutes = Math.floor(total / 60).toString().padStart(2, '0');
+   const remaining = (total % 60).toString().padStart(2, '0');
+   return `${minutes}:${remaining}`;
+};
+
 type RiskMarker = {
    id: string;
    lat: number;
@@ -48,12 +67,24 @@ function TacticalWorkerMap({
    const unitLat = Number(activeIncident?.assignedPersonnel?.location?.lat ?? incidentLat - 0.012);
    const unitLng = Number(activeIncident?.assignedPersonnel?.location?.lng ?? incidentLng - 0.01);
    const incidentPoint: LatLngExpression = [incidentLat, incidentLng];
-   const unitPoint: LatLngExpression = [unitLat, unitLng];
+   const trackingCurrent = activeIncident?.tracking?.currentLocation;
+   const currentLat = Number.isFinite(Number(trackingCurrent?.lat)) ? Number(trackingCurrent?.lat) : unitLat;
+   const currentLng = Number.isFinite(Number(trackingCurrent?.lng)) ? Number(trackingCurrent?.lng) : unitLng;
+   const unitPoint: LatLngExpression = [currentLat, currentLng];
+   const distanceKm = haversineKm(currentLat, currentLng, incidentLat, incidentLng);
 
    const routeMidPoint: LatLngExpression = [
       (unitLat + incidentLat) / 2 + 0.002,
       (unitLng + incidentLng) / 2 - 0.002,
    ];
+
+   const trackedPath: LatLngExpression[] = Array.isArray(activeIncident?.tracking?.path)
+      ? activeIncident.tracking.path
+           .filter((p: any) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)))
+           .map((p: any) => [Number(p.lat), Number(p.lng)] as LatLngExpression)
+      : [];
+
+   const routePoints: LatLngExpression[] = trackedPath.length >= 2 ? trackedPath : [unitPoint, routeMidPoint, incidentPoint];
 
    const nearbyFromOtherAssignments: RiskMarker[] = (incidents || [])
       .filter((inc: any) => inc?._id !== activeIncident?._id && inc?.location?.lat != null && inc?.location?.lng != null)
@@ -90,7 +121,7 @@ function TacticalWorkerMap({
             />
 
             <Polyline
-               positions={[unitPoint, routeMidPoint, incidentPoint]}
+               positions={routePoints}
                pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.9, dashArray: "10 6" }}
             />
 
@@ -102,7 +133,9 @@ function TacticalWorkerMap({
                <Tooltip direction="top">Responder Unit</Tooltip>
                <Popup>
                   <div className="text-[12px] font-bold">Responder Unit</div>
-                  <div className="text-[11px] text-slate-500">{unitLat.toFixed(5)}, {unitLng.toFixed(5)}</div>
+                  <div className="text-[11px] text-slate-500">{currentLat.toFixed(5)}, {currentLng.toFixed(5)}</div>
+                  <div className="text-[11px] uppercase text-slate-500">{String(trackingCurrent?.phase || activeIncident?.dispatchStatus || 'en-route')}</div>
+                  <div className="text-[11px] text-slate-500">{distanceKm.toFixed(2)} km away</div>
                </Popup>
             </CircleMarker>
 
@@ -150,6 +183,7 @@ export default function DriverHUD() {
   const [loading, setLoading] = useState(true);
    const [isRouting, setIsRouting] = useState(false);
    const [isCompleting, setIsCompleting] = useState(false);
+   const [, setClockTick] = useState(0);
    const activeIncidentIdRef = useRef<string | null>(null);
 
    const selectIncident = (incident: any | null) => {
@@ -210,16 +244,25 @@ export default function DriverHUD() {
       }
     };
     fetchIncidents();
-      const interval = setInterval(fetchIncidents, 10000);
-      return () => clearInterval(interval);
+         const interval = setInterval(fetchIncidents, 4000);
+         const clock = setInterval(() => setClockTick((value) => value + 1), 1000);
+         return () => {
+            clearInterval(interval);
+            clearInterval(clock);
+         };
   }, []);
 
    const handleInitializeRoute = async () => {
       if (!activeIncident) return;
       setIsRouting(true);
       try {
-         await api.put(`/incidents/${activeIncident._id}/status`, { status: 'investigating' });
-         toast.success("Route initialized and status updated to investigating");
+         const { data } = await api.post('/dispatch/start-journey-simulation', {
+            incidentId: activeIncident._id,
+            intervalMinutes: 1,
+            timeScale: 0.1,
+            speedKmph: 32,
+         });
+         toast.success(data?.message || "Journey simulation started");
          await refreshAssignments();
       } catch (err) {
          toast.error("Failed to initialize route");
@@ -264,7 +307,35 @@ export default function DriverHUD() {
       );
    });
 
-   const etaMinutes = activeIncident?.severity === 'critical' ? 8 : activeIncident?.severity === 'high' ? 12 : 18;
+   const trackingEta = Number(activeIncident?.tracking?.currentLocation?.etaMinutes);
+   const trackingEtaSeconds = Number(activeIncident?.tracking?.currentLocation?.etaSeconds);
+   const trackingPhase = String(activeIncident?.tracking?.currentLocation?.phase || activeIncident?.dispatchStatus || '').toLowerCase();
+   const incidentLat = Number(activeIncident?.location?.lat);
+   const incidentLng = Number(activeIncident?.location?.lng);
+   const unitLat = Number(activeIncident?.tracking?.currentLocation?.lat ?? activeIncident?.assignedPersonnel?.location?.lat);
+   const unitLng = Number(activeIncident?.tracking?.currentLocation?.lng ?? activeIncident?.assignedPersonnel?.location?.lng);
+   const liveDistanceKm = Number.isFinite(unitLat) && Number.isFinite(unitLng) && Number.isFinite(incidentLat) && Number.isFinite(incidentLng)
+      ? haversineKm(unitLat, unitLng, incidentLat, incidentLng)
+      : null;
+   const fallbackEtaMinutes =
+      Number.isFinite(unitLat) && Number.isFinite(unitLng) && Number.isFinite(incidentLat) && Number.isFinite(incidentLng)
+         ? Math.max(1, Math.round((haversineKm(unitLat, unitLng, incidentLat, incidentLng) / 28) * 60))
+         : null;
+   const etaBaseMinutes = Number.isFinite(trackingEta) ? trackingEta : fallbackEtaMinutes;
+   const lastEtaSampleAt = activeIncident?.tracking?.currentLocation?.at ? new Date(activeIncident.tracking.currentLocation.at).getTime() : Date.now();
+   const elapsedSinceSampleMinutes = Math.max(0, (Date.now() - lastEtaSampleAt) / 60000);
+   const etaBaseSeconds = Number.isFinite(trackingEtaSeconds)
+      ? trackingEtaSeconds
+      : Number.isFinite(etaBaseMinutes)
+         ? Number(etaBaseMinutes) * 60
+         : Number.isFinite(fallbackEtaMinutes)
+            ? Number(fallbackEtaMinutes) * 60
+            : Number.NaN;
+   const elapsedSinceSampleSeconds = Math.max(0, (Date.now() - lastEtaSampleAt) / 1000);
+   const liveEtaSeconds = Number.isFinite(etaBaseSeconds)
+      ? Math.max(0, Math.round(Number(etaBaseSeconds) - elapsedSinceSampleSeconds))
+      : Number.NaN;
+   const etaText = Number.isFinite(liveEtaSeconds) ? formatCountdown(liveEtaSeconds) : 'Estimating';
    const isResolved = Boolean(activeIncident && (activeIncident.status === 'resolved' || activeIncident.dispatchStatus === 'completed'));
    const isEngaged = Boolean(activeIncident && (activeIncident.status === 'investigating' || activeIncident.dispatchStatus === 'on-site' || activeIncident.dispatchStatus === 'resolving'));
    const canInitialize = Boolean(activeIncident) && !isResolved && !isEngaged;
@@ -367,8 +438,11 @@ export default function DriverHUD() {
                         <div className="w-1.5 h-1.5 rounded-full bg-secondary shadow-lg shadow-secondary" />
                         <span className="text-[10px] font-black text-secondary uppercase tracking-[0.3em]">Estimated Arrivals</span>
                      </div>
-                     <div className="text-4xl font-black tracking-tighter text-slate-900">{String(etaMinutes).padStart(2, '0')}:00</div>
-                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Relative to Vector Flow</span>
+                     <div className="text-4xl font-black tracking-tighter text-slate-900">{etaText}</div>
+                     <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Live from route telemetry</span>
+                     {Number.isFinite(liveDistanceKm) && (
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest mt-1">{liveDistanceKm.toFixed(2)} km away</span>
+                     )}
                   </div>
                   <div className="plinth-card bg-white p-8 flex flex-col justify-center border-none">
                      <div className="flex items-center gap-3 mb-3 text-emerald-500">

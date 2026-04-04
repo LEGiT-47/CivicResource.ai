@@ -23,6 +23,18 @@ const resourceColor: Record<string, string> = {
   medical: "#059669",
   public_works: "#ea580c",
   drone: "#7c3aed",
+  utility: "#0ea5e9",
+  sanitation: "#10b981",
+};
+
+const formatCountdown = (seconds: number) => {
+  if (!Number.isFinite(seconds)) return "--:--";
+  const total = Math.max(0, Math.round(seconds));
+  const minutes = Math.floor(total / 60)
+    .toString()
+    .padStart(2, "0");
+  const remaining = (total % 60).toString().padStart(2, "0");
+  return `${minutes}:${remaining}`;
 };
 
 type AnimatedUnit = {
@@ -70,11 +82,13 @@ function FocusIncidentController({
 export default function CityMap({
   incidents,
   resources = [],
+  personnel = [],
   selectedIncidentId,
   onIncidentSelect,
 }: {
   incidents: any[];
   resources?: any[];
+  personnel?: any[];
   selectedIncidentId?: string | null;
   onIncidentSelect?: (id: string) => void;
 }) {
@@ -88,6 +102,16 @@ export default function CityMap({
   const validIncidents = useMemo(
     () => incidents.filter((inc: any) => inc?.location?.lat != null && inc?.location?.lng != null),
     [incidents]
+  );
+  const activePersonnel = useMemo(
+    () =>
+      personnel.filter(
+        (person: any) =>
+          (person?.status === "busy" || Boolean(person?.currentIncident)) &&
+          person?.location?.lat != null &&
+          person?.location?.lng != null
+      ),
+    [personnel]
   );
 
   useEffect(() => {
@@ -134,6 +158,34 @@ export default function CityMap({
 
     return () => clearInterval(timer);
   }, []);
+
+  const livePersonnel = activePersonnel.map((person: any, idx: number) => {
+    const liveLocation = person?.currentIncident?.tracking?.currentLocation;
+    const currentLat = Number.isFinite(Number(liveLocation?.lat)) ? Number(liveLocation.lat) : Number(person.location.lat);
+    const currentLng = Number.isFinite(Number(liveLocation?.lng)) ? Number(liveLocation.lng) : Number(person.location.lng);
+    const targetLocation = person?.currentIncident?.location || person.location;
+    const path = Array.isArray(person?.currentIncident?.tracking?.path) ? person.currentIncident.tracking.path : [];
+    const etaSeconds = Number.isFinite(Number(liveLocation?.etaSeconds))
+      ? Number(liveLocation.etaSeconds)
+      : Number.isFinite(Number(liveLocation?.etaMinutes))
+        ? Number(liveLocation.etaMinutes) * 60
+        : Number.NaN;
+
+    return {
+      _id: String(person._id),
+      label: person.contact?.unitId || person.name || `Responder ${idx + 1}`,
+      type: person.type,
+      status: person.status,
+      lat: currentLat,
+      lng: currentLng,
+      targetLat: Number(targetLocation?.lat ?? currentLat),
+      targetLng: Number(targetLocation?.lng ?? currentLng),
+      trackingPath: path,
+      trackingPhase: String(liveLocation?.phase || person?.currentIncident?.dispatchStatus || person.status || "").toLowerCase(),
+      trackingEta: Number(liveLocation?.etaMinutes),
+      trackingEtaSeconds: etaSeconds,
+    };
+  });
 
   return (
     <div className="w-full h-full relative overflow-hidden">
@@ -244,6 +296,58 @@ export default function CityMap({
               </CircleMarker>
             </div>
           ))}
+
+        {livePersonnel.map((person) => {
+          const path = Array.isArray(person.trackingPath) && person.trackingPath.length >= 2
+            ? person.trackingPath
+                .filter((p: any) => Number.isFinite(Number(p?.lat)) && Number.isFinite(Number(p?.lng)))
+                .map((p: any) => [Number(p.lat), Number(p.lng)] as LatLngExpression)
+            : [
+                [person.lat, person.lng] as LatLngExpression,
+                [person.targetLat, person.targetLng] as LatLngExpression,
+              ];
+
+          return (
+            <div key={`person-wrap-${person._id}`}>
+              <Polyline
+                key={`person-route-${person._id}`}
+                positions={path}
+                pathOptions={{
+                  color: resourceColor[person.type] || "#0f172a",
+                  weight: 3,
+                  opacity: 0.8,
+                  dashArray: "8 8",
+                }}
+              />
+              <CircleMarker
+                key={`person-${person._id}`}
+                center={[person.lat, person.lng]}
+                radius={person.status === "busy" ? 10 : 8}
+                pathOptions={{
+                  color: "#ffffff",
+                  weight: 2,
+                  fillColor: resourceColor[person.type] || "#0f172a",
+                  fillOpacity: 1,
+                }}
+              >
+                <Tooltip direction="top" offset={[0, -8]}>
+                  <div className="text-[11px] font-bold">{person.label}</div>
+                  <div className="text-[10px] uppercase">{person.type.replace("_", " ")} • {person.status}</div>
+                </Tooltip>
+                <Popup>
+                  <div className="min-w-[220px]">
+                    <div className="text-[12px] font-bold mb-1">{person.label}</div>
+                    <div className="text-[11px] uppercase text-slate-600 mb-1">{person.type.replace("_", " ")} • {person.status}</div>
+                    <div className="text-[11px] text-slate-500">Current: {person.lat.toFixed(5)}, {person.lng.toFixed(5)}</div>
+                    <div className="text-[11px] text-slate-500">Target: {person.targetLat.toFixed(5)}, {person.targetLng.toFixed(5)}</div>
+                    <div className="text-[11px] text-slate-500">Phase: {person.trackingPhase || "en-route"}</div>
+                    {Number.isFinite(person.trackingEtaSeconds) && <div className="text-[11px] text-slate-500">ETA: {formatCountdown(person.trackingEtaSeconds)}</div>}
+                  </div>
+                </Popup>
+              </CircleMarker>
+            </div>
+          );
+        })}
       </MapContainer>
 
       <div className="absolute top-4 left-4 z-[1000] bg-white/95 backdrop-blur-md p-3 rounded-xl border border-border/40 shadow-plinth space-y-2 w-[300px]">
