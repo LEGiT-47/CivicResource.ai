@@ -27,21 +27,13 @@ export default function DispatchSystem() {
                 api.get('/dispatch/personnel'),
                 api.get('/resources')
             ]);
-            setIncidents(incRes.data.filter((i: any) => i.dispatchStatus === 'unassigned'));
+            setIncidents((incRes.data || []).filter((i: any) => i.status !== 'resolved'));
             setPersonnel(perRes.data);
             setResources(resourceRes.data || []);
         } catch (err) {
             console.error("Dispatch fetch failed", err);
             toast.error("Unable to sync dispatch data");
         }
-    };
-
-    const personnelToIncidentTypeMap: Record<string, string[]> = {
-        police: ["crime", "safety", "traffic"],
-        fire: ["fire"],
-        medical: ["medical"],
-        utility: ["utility", "infrastructure", "water"],
-        sanitation: ["sanitation"],
     };
 
   useEffect(() => {
@@ -59,8 +51,6 @@ export default function DispatchSystem() {
         personnelId
       });
       toast.success("Personnel Dispatched Successfully");
-            setIncidents((prev) => prev.filter((i) => i._id !== selectedIncident._id));
-      setSelectedIncident(null);
             fetchData();
         } catch (err: any) {
             toast.error(err?.response?.data?.message || "Dispatch Failed");
@@ -116,11 +106,7 @@ export default function DispatchSystem() {
         return p.type === "medical";
     });
 
-    const typeMatchedPersonnel = filteredPersonnel.filter((p) => {
-        if (!selectedIncident) return true;
-        const allowedTypes = personnelToIncidentTypeMap[p.type] || [];
-        return allowedTypes.includes(selectedIncident.type);
-    });
+    const typeMatchedPersonnel = filteredPersonnel;
 
     const formatCoord = (n?: number) => (typeof n === 'number' ? n.toFixed(4) : 'NA');
 
@@ -187,7 +173,7 @@ export default function DispatchSystem() {
                 ))}
                 {selectedIncident && typeMatchedPersonnel.length === 0 && (
                     <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-200 text-xs font-bold uppercase tracking-wider">
-                        No available personnel match this incident type right now.
+                        No available personnel right now.
                     </div>
                 )}
             </div>

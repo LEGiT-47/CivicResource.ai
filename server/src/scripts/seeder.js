@@ -229,12 +229,12 @@ const seedData = async () => {
     personnel[0].status = 'busy';
     personnel[0].currentIncident = incidents[0]._id;
 
-    // Worker 2 (ongoing)
+    // Worker 2 (resolved/inactive) so police has at least one available responder for new Public Safety dispatches
     incidents[1].assignedPersonnel = personnel[1]._id;
-    incidents[1].dispatchStatus = 'on-site';
-    incidents[1].status = 'investigating';
-    personnel[1].status = 'busy';
-    personnel[1].currentIncident = incidents[1]._id;
+    incidents[1].dispatchStatus = 'completed';
+    incidents[1].status = 'resolved';
+    personnel[1].status = 'available';
+    personnel[1].currentIncident = null;
 
     // Worker 3 (ongoing)
     incidents[2].assignedPersonnel = personnel[2]._id;

@@ -1,4 +1,5 @@
 import Incident from '../models/Incident.js';
+import Personnel from '../models/Personnel.js';
 
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:8000';
 
@@ -252,6 +253,29 @@ export const updateIncidentStatus = async (req, res, next) => {
 
     if (incident) {
       incident.status = status;
+
+      // Closing an incident must release the assigned responder back to the available pool.
+      if (status === 'resolved') {
+        incident.dispatchStatus = 'completed';
+
+        const personnelIds = [
+          ...(incident.assignedPersonnel ? [incident.assignedPersonnel] : []),
+          ...(incident.assignedPersonnelList || []),
+        ].map((id) => String(id));
+
+        const uniquePersonnelIds = [...new Set(personnelIds)].filter(Boolean);
+
+        if (uniquePersonnelIds.length > 0) {
+          await Personnel.updateMany(
+            { _id: { $in: uniquePersonnelIds } },
+            { $set: { status: 'available', currentIncident: null } }
+          );
+        }
+
+        incident.assignedPersonnel = null;
+        incident.assignedPersonnelList = [];
+      }
+
       const updatedIncident = await incident.save();
       res.json(updatedIncident);
     } else {

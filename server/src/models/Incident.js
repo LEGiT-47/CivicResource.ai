@@ -47,6 +47,12 @@ const incidentSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Personnel',
     },
+    assignedPersonnelList: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Personnel',
+      },
+    ],
     aiPredictionConfidence: {
       type: Number,
       default: 0,

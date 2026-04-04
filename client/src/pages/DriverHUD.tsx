@@ -158,7 +158,23 @@ export default function DriverHUD() {
    };
 
    const refreshAssignments = async () => {
-      const { data } = await api.get('/dispatch/my-assignments');
+      let data: any[] = [];
+      try {
+         const resp = await api.get('/dispatch/my-assignments');
+         data = resp.data || [];
+      } catch (err: any) {
+         const stored = localStorage.getItem('CivicFlow_user');
+         const parsed = stored ? JSON.parse(stored) : null;
+         const unitId = String(parsed?.unitId || '').trim();
+
+         if (unitId) {
+            const fallback = await api.get(`/dispatch/assignments/${unitId.toUpperCase()}`);
+            data = fallback.data?.assignedIncidents || [];
+         } else if (err?.response?.status >= 500) {
+            throw err;
+         }
+      }
+
       setIncidents(data || []);
 
       const sorted = [...(data || [])].sort((a: any, b: any) => {
@@ -188,7 +204,7 @@ export default function DriverHUD() {
         await refreshAssignments();
       } catch (err) {
         console.error("DriverHUD fetch failed", err);
-        toast.error("Unable to load your assignments");
+            toast.error("Unable to load your assignments. Please reload once.");
       } finally {
         setLoading(false);
       }

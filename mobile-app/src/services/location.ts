@@ -6,6 +6,18 @@ export interface DeviceLocation {
   address: string;
 }
 
+export const getAddressFromCoordinates = async (lat: number, lng: number): Promise<string> => {
+  const reverse = await Location.reverseGeocodeAsync({
+    latitude: lat,
+    longitude: lng,
+  });
+
+  const first = reverse[0];
+  return first
+    ? [first.name, first.street, first.city, first.region].filter(Boolean).join(', ')
+    : `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+};
+
 export const getCurrentLocation = async (): Promise<DeviceLocation | null> => {
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') {
@@ -16,15 +28,7 @@ export const getCurrentLocation = async (): Promise<DeviceLocation | null> => {
     accuracy: Location.Accuracy.Balanced,
   });
 
-  const reverse = await Location.reverseGeocodeAsync({
-    latitude: coords.coords.latitude,
-    longitude: coords.coords.longitude,
-  });
-
-  const first = reverse[0];
-  const address = first
-    ? [first.name, first.street, first.city, first.region].filter(Boolean).join(', ')
-    : 'Current location';
+  const address = await getAddressFromCoordinates(coords.coords.latitude, coords.coords.longitude);
 
   return {
     lat: coords.coords.latitude,

@@ -1,97 +1,142 @@
-# 🏙️ CivicResource Ai: AI-Powered Urban Resource Optimization
+# CivicResource.ai
 
-CivicResource Ai is a high-fidelity, full-stack "Digital Twin" platform designed to optimize city resource allocation through predictive intelligence and interactive real-time management.
+AI-assisted civic operations platform for complaint intake, dispatch orchestration, and field execution.
 
-## 🚀 Key Features
+It combines three connected surfaces:
 
-*   **⚡ Predictive Command Center**: Real-time map-based visualization of incidents and resource locations.
-*   **📊 Intelligence Hub**: Advanced analytics and forecasting driven by a custom Node.js/MongoDB AI engine.
-*   **📡 Citizen Reporting**: Seamless incident submission flow with automatic priority triage.
-*   **🚛 Driver HUD**: Dedicated unit-task assignment interface for field operations.
-*   **🔐 HUD Security**: Enterprise-grade JWT authentication and protected route architecture.
-*   **🧠 Demand Prediction Engine**: Zone demand is predicted using a blended ensemble model (Random Forest + Gradient Boosting) with weather, complaint history, event factor, and population density inputs.
-*   **🎯 Smart Allocation Suggestions**: AI now generates resource-to-zone recommendations using urgency-ranked demand and travel-distance-aware assignment.
-*   **🔄 Real-Time Optimization Loop**: Intelligence Matrix runs live AI pulse analysis and continuously refreshes demand/allocation insights.
+1. Web control system for admin and operations teams.
+2. Mobile app for citizens and field workers.
+3. AI engine for demand analysis and optimization suggestions.
 
-## 🛠️ Technology Stack
+## What This Project Solves
 
-| Layer | Technologies |
-| :--- | :--- |
-| **Frontend** | React 18, Vite, Tailwind CSS, Framer Motion, Recharts, Lucide Icons |
-| **Backend** | Node.js, Express, MongoDB (Mongoose), JSON Web Token (JWT), Bcrypt |
-| **State/API** | React Query (TanStack), Axios with HTTP Interceptors |
-| **AI Engine** | FastAPI, scikit-learn (DBSCAN, RandomForestRegressor, GradientBoostingRegressor), NumPy, spaCy |
+City operations teams usually work with fragmented tools and delayed communication loops. CivicResource.ai creates one operational flow:
 
----
+1. Citizen raises issue.
+2. Admin triages and dispatches the right worker type.
+3. Worker executes in field with a tactical HUD.
+4. System tracks lifecycle from unassigned to resolved.
 
-## 🏁 Getting Started
+## Core Features
 
-### 1. Prerequisites
-- Node.js (v18+)
-- MongoDB (Running locally or via Atlas)
+### Citizen Experience
 
-### 2. Installation
-Clone the repository and install dependencies for both the client and server:
+1. Complaint filing with multilingual input support.
+2. Tracking by phone or tracking ID.
+3. Offline queue and auto-sync when network is back.
 
-```bash
-# Root directory
-npm install
+### Admin Experience (Web)
 
-# Client
-cd client && npm install
+1. Live command center with map and feeds.
+2. Dispatch system with type-safe worker assignment.
+3. Incident archive and operational analytics.
 
-# Server
-cd server && npm install
-```
+### Worker Experience (Web + Mobile)
 
-### 3. Environment Configuration
-Create a `.env` file in the `server` directory:
-```env
-PORT=5000
-MONGODB_URI=mongodb://localhost:27017/CivicResource Ai
-JWT_SECRET=your_super_secret_key_here
-```
+1. Assignment-focused operational HUD.
+2. Workflow actions: initialize route, resolve incident.
+3. Tactical map with coordinates, route polyline, and nearby risk markers (web HUD).
+4. Mobile assignment loading from logged-in account, with optional Unit ID fallback.
 
-### 4. Database Seeding
-Populate the database with initial operational data (Resources, Incidents, Analytics):
-```bash
-cd server
-npm run seed
-```
+## Tech Stack
 
-### 5. Running the Application
-Open two terminal windows:
+### Web Client
 
-**Terminal 1 (Backend):**
-```bash
-cd server
-npm run dev
-```
+1. React 18 + Vite + TypeScript
+2. Tailwind CSS + Framer Motion
+3. React Leaflet for maps
 
-**Terminal 2 (Frontend):**
-```bash
-cd client
-npm run dev
-```
+### Backend
 
-The application will be available at `http://localhost:5173`.
+1. Node.js + Express
+2. MongoDB + Mongoose
+3. JWT auth + bcrypt password hashing
 
----
+### Mobile App
 
-## 🏗️ Architecture Overview
+1. Expo + React Native + TypeScript
+2. AsyncStorage, NetInfo, local notifications
 
-CivicResource Ai uses a **Decoupled Private Backend** architecture:
-- The frontend resides in `/client`.
-- The backend resides in `/server`.
-- All dashboard routes (`/app/*`) are guarded by a `ProtectedRoute` component that validates sessions against the server.
+### AI Engine
 
-### AI Optimization Flow
-- Data Input System: incidents are aggregated into geo-zones with derived features (complaints, weather proxy, event factor, population density).
-- Demand Prediction Engine: ensemble forecasting ranks zones by urgency and predicts recommended units.
-- Smart Allocation: available resources are matched to urgent zones using a distance-aware greedy optimizer.
-- Interactive Dashboard Output: Intelligence Matrix and Strategic views consume these outputs (`demandForecast`, `allocationPlan`, `allocationSummary`, `strategicAdvice`) for actionable UI.
+1. FastAPI (Python)
+2. Forecasting and allocation endpoints consumed by web dashboard
 
-### New AI/Backend Endpoints Used
-- `POST /analyze/demand-forecast` (AI engine): urgency-ranked demand forecast.
-- `POST /analyze/resource-allocation` (AI engine): resource-to-zone optimized recommendations.
-- `POST /api/dispatch/ai-analyze` (backend): combined clusters, heatmap, demand, and allocation payload for frontend.
+## Repository Structure
+
+1. client: Web application
+2. server: REST API, auth, incident/dispatch logic, seeding
+3. mobile-app: Citizen + worker mobile app
+4. ai-engine: Python AI services
+5. prd.md: Product requirements and vision
+
+## Quick Start
+
+### Prerequisites
+
+1. Node.js 18+
+2. Python 3.10+
+3. MongoDB (Atlas or local)
+4. Android Studio (for mobile emulator)
+
+### Install
+
+1. Install web dependencies in client.
+2. Install backend dependencies in server.
+3. Install mobile dependencies in mobile-app.
+4. Install Python dependencies in ai-engine.
+
+### Configure
+
+1. Set server environment values in server/.env.
+2. Set mobile environment values in mobile-app/.env.
+3. Ensure API and AI URLs are reachable from emulator/device.
+
+### Seed Data
+
+Run seeding from server to create users, personnel, incidents, resources, and analytics.
+
+Important seeded users include:
+
+1. admin@civicflow.ai
+2. operator@civicflow.ai
+3. worker1@civicflow.ai through worker10@civicflow.ai
+
+## Run Locally
+
+Run these services in parallel:
+
+1. server: backend API
+2. ai-engine: Python AI service
+3. client: web app
+4. mobile-app: Expo app (optional if demoing mobile)
+
+## End-to-End Flow
+
+1. Citizen submits complaint.
+2. Complaint appears in admin dispatch queue.
+3. Admin assigns compatible worker type.
+4. Worker sees assignment and starts execution.
+5. Worker resolves incident.
+6. Admin views updated status and history.
+
+## Security and Access
+
+1. Protected web routes require valid token.
+2. Role-based behavior for admin/operator/responder.
+3. Worker assignment endpoint is scoped to logged-in worker account.
+
+## Demo Notes (Hackathon Friendly)
+
+1. Keep seeded data fresh by running server seed before demo.
+2. Use one browser session for admin and another for worker.
+3. Demonstrate full lifecycle with one incident from creation to closure.
+4. Show tactical map during worker step for field situational awareness.
+
+## Documentation for Team
+
+For deeper onboarding and architecture details, read TEAMMATE_GUIDE.md at project root.
+
+## License
+
+Internal project / competition submission usage unless otherwise specified.

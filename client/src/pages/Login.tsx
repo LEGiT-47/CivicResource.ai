@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  Zap, ArrowRight, Mail, Lock, 
+   ArrowRight, Mail, Lock, 
    ShieldCheck, Activity, Globe2, ChevronLeft, Users, Eye, EyeOff
 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { normalizeRole } from "@/lib/session";
+import { BrandMark } from "@/components/BrandMark";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -31,6 +32,7 @@ export default function Login() {
             email: data.email,
             organization: data.organization,
             role: normalizedRole,
+            unitId: data.unitId || null,
          }));
       navigate(normalizedRole === "admin" ? "/app" : "/app/driver");
     } catch (err: any) {
@@ -50,9 +52,7 @@ export default function Login() {
         
         <div className="max-w-md w-full mx-auto flex-1 flex flex-col justify-center">
             <div className="flex items-center gap-4 mb-12">
-               <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20">
-                  <Zap className="w-6 h-6 text-white" />
-               </div>
+               <BrandMark className="w-12 h-12 shadow-2xl" letterClassName="text-2xl" />
                <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicFlow</span>
             </div>
 

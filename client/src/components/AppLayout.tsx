@@ -3,7 +3,6 @@ import { useLocation, useNavigate } from "react-router-dom";
 import {
   Menu,
   X,
-  Zap,
   LogOut,
   Bell,
   User,
@@ -22,6 +21,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { getSessionRole, getStoredUser } from "@/lib/session";
+import { BrandMark } from "@/components/BrandMark";
 
 const workerNavItems = [
   { to: "/app", label: "Strategic Map", icon: LayoutGrid },
@@ -66,9 +66,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="hidden lg:flex flex-col w-[280px] bg-white border-r border-border/40 shadow-[20px_0_40px_-20px_rgba(0,0,0,0.02)] z-30 transition-all duration-500">
         <div className="p-8 mb-4">
           <div className="flex items-center gap-3.5 group cursor-pointer" onClick={() => navigate("/app") }>
-            <div className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 group-hover:scale-105 transition-transform">
-              <Zap className="w-6 h-6 text-white" />
-            </div>
+            <BrandMark className="w-11 h-11 group-hover:scale-105 transition-transform" letterClassName="text-xl" />
             <div>
               <h1 className="text-xl font-black tracking-tighter text-slate-900 uppercase leading-none">CivicFlow</h1>
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1 block">{sessionRole === "admin" ? "Admin Console" : "Field Relay"}</span>
@@ -201,9 +199,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             >
                <div className="p-8 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-lg">
-                      <Zap className="w-6 h-6 text-white" />
-                    </div>
+                    <BrandMark className="w-10 h-10 shadow-lg" letterClassName="text-lg" />
                     <span className="font-black text-2xl tracking-tighter uppercase">CivicFlow</span>
                   </div>
                   <button onClick={() => setMobileOpen(false)} className="p-3 rounded-2xl bg-slate-50"><X className="w-7 h-7" /></button>

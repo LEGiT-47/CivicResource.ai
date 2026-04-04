@@ -1,45 +1,28 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  FileText, Search, Filter, ChevronRight, 
-  Download, Share2, Archive, BarChart3, 
-  Activity, CheckCircle2, AlertCircle, Clock,
-  Brain, Zap, Shield
+    FileText, Search,
+    Download, Archive, Clock,
+    Brain, Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { toast } from "sonner";
-
-const mockPerformanceData = [
-    { time: "00:00", active: 45, resolved: 30 },
-    { time: "04:00", active: 52, resolved: 35 },
-    { time: "08:00", active: 68, resolved: 45 },
-    { time: "12:00", active: 75, resolved: 55 },
-    { time: "16:00", active: 62, resolved: 50 },
-    { time: "20:00", active: 55, resolved: 48 },
-    { time: "23:59", active: 48, resolved: 42 },
-];
 
 export default function ReportsArchive() {
   const [reports, setReports] = useState<any[]>([]);
-    const [resources, setResources] = useState<any[]>([]);
     const [personnel, setPersonnel] = useState<any[]>([]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
-    const [actionLoading, setActionLoading] = useState(false);
-    const [newResourceType, setNewResourceType] = useState<"police" | "fire" | "medical" | "public_works" | "drone">("public_works");
 
     const syncArchiveData = async () => {
         try {
-            const [reportsRes, resourcesRes, personnelRes] = await Promise.all([
+            const [reportsRes, personnelRes] = await Promise.all([
                 api.get('/incidents?status=all'),
-                api.get('/resources'),
-                api.get('/dispatch/personnel')
+                api.get('/dispatch/personnel?all=true')
             ]);
             setReports(reportsRes.data);
-            setResources(resourcesRes.data || []);
             setPersonnel(personnelRes.data || []);
         } catch (err) {
             console.error("Reports fetch failed", err);
@@ -51,85 +34,28 @@ export default function ReportsArchive() {
         syncArchiveData();
   }, []);
 
-    const updateStatus = async (status: 'active' | 'investigating' | 'resolved') => {
-        if (!selectedReport) return;
-        setActionLoading(true);
-        try {
-            const { data } = await api.put(`/incidents/${selectedReport._id}/status`, { status });
-            setSelectedReport(data);
-            toast.success(`Incident marked as ${status}`);
-            await syncArchiveData();
-        } catch (err) {
-            console.error(err);
-            toast.error("Unable to update incident status");
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const assignPersonnel = async (personnelId: string) => {
-        if (!selectedReport) return;
-        setActionLoading(true);
-        try {
-            await api.post('/dispatch/assign', {
-                incidentId: selectedReport._id,
-                personnelId,
-            });
-            toast.success("Personnel allocated successfully");
-            await syncArchiveData();
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to allocate personnel");
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const dispatchResourceToSelected = async (resourceId: string) => {
-        if (!selectedReport) return;
-        setActionLoading(true);
-        try {
-            await api.put(`/resources/${resourceId}/dispatch`, { incidentId: selectedReport._id });
-            toast.success("Resource sent to incident");
-            await syncArchiveData();
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to send resource");
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const createAndDispatchNewResource = async () => {
-        if (!selectedReport) return;
-        setActionLoading(true);
-        try {
-            const unitCode = Math.floor(100 + Math.random() * 900);
-            const { data: createdResource } = await api.post('/resources', {
-                name: `${newResourceType.replace('_', ' ').toUpperCase()} UNIT-${unitCode}`,
-                type: newResourceType,
-                location: selectedReport.location,
-                batteryOrFuelLevel: 100,
-            });
-
-            await api.put(`/resources/${createdResource._id}/dispatch`, { incidentId: selectedReport._id });
-            toast.success("New resource created and dispatched");
-            await syncArchiveData();
-        } catch (err) {
-            console.error(err);
-            toast.error("Unable to create and dispatch new resource");
-        } finally {
-            setActionLoading(false);
-        }
-    };
-
-    const availableResources = resources.filter((r) => r.status === 'patrol');
-
   const filteredReports = reports.filter(r => {
     if (filter !== "all" && r.status !== filter) return false;
     if (search && !r.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+    const getAssignedDisplayNames = (report: any) => {
+        const rawAssigned = [
+            ...(Array.isArray(report.assignedPersonnelList) ? report.assignedPersonnelList : []),
+            report.assignedPersonnel,
+        ].filter(Boolean);
+
+        if (!rawAssigned.length) return "Not assigned";
+
+        const ids = rawAssigned.map((p: any) => (typeof p === "string" ? p : p?._id)).filter(Boolean);
+        const resolvedNames = ids.map((id: string) => {
+            const person = personnel.find((p: any) => p._id === id);
+            return person?.name || id;
+        });
+
+        return Array.from(new Set(resolvedNames)).join(", ");
+    };
 
   return (
     <div className="flex flex-col h-screen bg-slate-50/30 overflow-hidden font-inter">
@@ -266,250 +192,41 @@ export default function ReportsArchive() {
                         exit={{ opacity: 0, x: -20 }}
                         className="p-12 max-w-5xl mx-auto space-y-12 pb-32"
                     >
-                        {/* Summary Header */}
                         <div className="flex items-start justify-between gap-12">
                             <div className="flex-1">
-                                <span className="text-primary font-black text-[10px] uppercase tracking-[0.5em] block mb-4">Signal Investigation Matrix</span>
                                 <h1 className="text-5xl font-black uppercase tracking-tighter text-slate-900 leading-none mb-6">{selectedReport.title}</h1>
-                                <div className="flex items-center gap-8 text-[11px] font-black text-slate-400 uppercase tracking-widest">
-                                    <div className="flex items-center gap-2.5">
-                                        <AlertCircle className="w-4 h-4 text-primary" /> Severity: <span className="text-slate-900">{selectedReport.severity}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2.5">
-                                        <Shield className="w-4 h-4 text-emerald-500" /> Resolution: <span className="text-slate-900">89% Mitigation</span>
-                                    </div>
-                                    <div className="flex items-center gap-2.5">
-                                        <Zap className="w-4 h-4 text-indigo-500" /> Confidence: <span className="text-slate-900">{selectedReport.aiPredictionConfidence}%</span>
-                                    </div>
-                                </div>
-
-                                                                {(selectedReport.sourceLanguage || 'english') !== 'english' && (
-                                                                    <div className="mt-8 p-6 bg-white border border-border/40 rounded-2xl">
-                                                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-3">
-                                                                            Multilingual Archive Record
-                                                                        </p>
-                                                                        <p className="text-xs font-black text-slate-900 uppercase tracking-wide mb-2">
-                                                                            Source ({selectedReport.sourceLanguage}): {selectedReport.titleOriginal || selectedReport.title}
-                                                                        </p>
-                                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide leading-relaxed mb-4">
-                                                                            {selectedReport.detailsOriginal || selectedReport.details || 'No original description provided'}
-                                                                        </p>
-                                                                        <p className="text-xs font-black text-primary uppercase tracking-wide mb-2">
-                                                                            English normalized: {selectedReport.titleEnglish || selectedReport.title}
-                                                                        </p>
-                                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide leading-relaxed">
-                                                                            {selectedReport.detailsEnglish || selectedReport.details || 'No English normalized description available'}
-                                                                        </p>
-                                                                    </div>
-                                                                )}
+                                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Incident ID: #{selectedReport._id.slice(-6)}</p>
                             </div>
-                            <div className="flex items-center gap-4">
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const blob = new Blob([JSON.stringify(selectedReport, null, 2)], { type: 'application/json' });
-                                                                        const url = URL.createObjectURL(blob);
-                                                                        const link = document.createElement('a');
-                                                                        link.href = url;
-                                                                        link.download = `incident-${selectedReport._id}.json`;
-                                                                        link.click();
-                                                                        URL.revokeObjectURL(url);
-                                                                    }}
-                                                                    className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all"
-                                                                >
-                                    <Download className="w-5 h-5" />
-                                </button>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const shareText = `Incident: ${selectedReport.title}\nStatus: ${selectedReport.status}\nSeverity: ${selectedReport.severity}`;
-                                                                        navigator.clipboard.writeText(shareText);
-                                                                        toast.success("Incident summary copied");
-                                                                    }}
-                                                                    className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all"
-                                                                >
-                                    <Share2 className="w-5 h-5" />
-                                </button>
-                            </div>
+                            <button
+                                onClick={() => {
+                                    const blob = new Blob([JSON.stringify(selectedReport, null, 2)], { type: 'application/json' });
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `incident-${selectedReport._id}.json`;
+                                    link.click();
+                                    URL.revokeObjectURL(url);
+                                }}
+                                className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all"
+                            >
+                                <Download className="w-5 h-5" />
+                            </button>
                         </div>
 
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <div className="bg-white border border-border/40 rounded-2xl p-6 space-y-4">
-                                                        <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Official Actions</h3>
-                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                                            <button
-                                                                disabled={actionLoading}
-                                                                onClick={() => updateStatus('investigating')}
-                                                                className="px-3 py-3 rounded-xl border border-border/40 text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all disabled:opacity-50"
-                                                            >
-                                                                Allocate Case
-                                                            </button>
-                                                            <button
-                                                                disabled={actionLoading}
-                                                                onClick={() => updateStatus('active')}
-                                                                className="px-3 py-3 rounded-xl border border-border/40 text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all disabled:opacity-50"
-                                                            >
-                                                                Reopen
-                                                            </button>
-                                                            <button
-                                                                disabled={actionLoading}
-                                                                onClick={() => updateStatus('resolved')}
-                                                                className="px-3 py-3 rounded-xl border border-border/40 text-[9px] font-black uppercase tracking-widest hover:border-emerald-500 hover:text-emerald-600 transition-all disabled:opacity-50"
-                                                            >
-                                                                Mark Resolved
-                                                            </button>
-                                                        </div>
-                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current status: {selectedReport.status}</p>
-                                                    </div>
-
-                                                    <div className="bg-white border border-border/40 rounded-2xl p-6 space-y-4">
-                                                        <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Allocate Personnel</h3>
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                            {personnel.slice(0, 4).map((p) => (
-                                                                <button
-                                                                    key={p._id}
-                                                                    disabled={actionLoading}
-                                                                    onClick={() => assignPersonnel(p._id)}
-                                                                    className="px-3 py-3 rounded-xl border border-border/40 text-left text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all disabled:opacity-50"
-                                                                >
-                                                                    {p.name}
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                        {personnel.length === 0 && (
-                                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No available personnel</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                        {/* AI Analysis Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div className="plinth-card p-10 bg-white space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-indigo-50 flex items-center justify-center">
-                                        <Brain className="w-6 h-6 text-indigo-500" />
-                                    </div>
-                                    <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900">Growth vs Mitigation</h3>
-                                </div>
-                                <p className="text-xs font-bold text-slate-500 leading-relaxed uppercase tracking-wide">
-                                    AI clustering indicates a <span className="text-red-500 font-black">+14.2%</span> growth in signal density within this vector over the last 24 hours. Current mitigation logic suggests a <span className="text-emerald-500 font-black">78%</span> success rate in resolving interdependent infrastructure links.
-                                </p>
-                                <div className="h-48 w-full bg-slate-50/50 rounded-2xl border border-border/40 flex items-center justify-center border-dashed">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <AreaChart data={mockPerformanceData}>
-                                            <defs>
-                                                <linearGradient id="colorReport" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.1}/>
-                                                    <stop offset="95%" stopColor="#4F46E5" stopOpacity={0}/>
-                                                </linearGradient>
-                                            </defs>
-                                            <Area type="monotone" dataKey="active" stroke="#4F46E5" fill="url(#colorReport)" strokeWidth={3} />
-                                        </AreaChart>
-                                    </ResponsiveContainer>
-                                </div>
-                            </div>
-
-                            <div className="plinth-card p-10 bg-slate-900 border-none space-y-8">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center">
-                                        <Activity className="w-6 h-6 text-primary" />
-                                    </div>
-                                    <h3 className="text-xl font-black uppercase tracking-tighter text-white">Strategic Mitigation</h3>
-                                </div>
-                                <div className="space-y-4">
-                                    {[
-                                        { l: "Cluster Impact", v: "High", c: "bg-red-500" },
-                                        { l: "Resource Utilization", v: "Optimized", c: "bg-emerald-500" },
-                                        { l: "Predicted Recurrence", v: "Low", c: "bg-emerald-500" },
-                                    ].map(item => (
-                                        <div key={item.l} className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/10">
-                                            <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">{item.l}</span>
-                                            <div className="flex items-center gap-3">
-                                                <div className={cn("w-2 h-2 rounded-full", item.c)} />
-                                                <span className="text-[10px] font-black text-white uppercase tracking-widest">{item.v}</span>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                                                <button
-                                                                    onClick={() => {
-                                                                        const blob = new Blob([JSON.stringify(selectedReport, null, 2)], { type: 'application/json' });
-                                                                        const url = URL.createObjectURL(blob);
-                                                                        const link = document.createElement('a');
-                                                                        link.href = url;
-                                                                        link.download = `official-incident-report-${selectedReport._id}.json`;
-                                                                        link.click();
-                                                                        URL.revokeObjectURL(url);
-                                                                        toast.success("Official report generated");
-                                                                    }}
-                                                                    className="w-full bg-primary py-4 rounded-xl text-white font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all"
-                                                                >
-                                                                        Generate Official Report
-                                                                </button>
-                            </div>
-                        </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                                    <div className="plinth-card p-8 bg-white space-y-4">
-                                                        <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900">Send Existing Resource</h3>
-                                                        <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
-                                                            {availableResources.slice(0, 6).map((resource) => (
-                                                                <button
-                                                                    key={resource._id}
-                                                                    disabled={actionLoading}
-                                                                    onClick={() => dispatchResourceToSelected(resource._id)}
-                                                                    className="w-full flex items-center justify-between p-4 rounded-xl border border-border/40 hover:border-primary hover:text-primary transition-all disabled:opacity-50"
-                                                                >
-                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">{resource.name}</span>
-                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{resource.type}</span>
-                                                                </button>
-                                                            ))}
-                                                            {availableResources.length === 0 && (
-                                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No patrol resources available</p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="plinth-card p-8 bg-white space-y-4">
-                                                        <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900">Create New Resource</h3>
-                                                        <select
-                                                            value={newResourceType}
-                                                            onChange={(e) => setNewResourceType(e.target.value as "police" | "fire" | "medical" | "public_works" | "drone")}
-                                                            className="w-full bg-slate-50 border border-border/40 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest"
-                                                        >
-                                                            <option value="public_works">Public Works</option>
-                                                            <option value="police">Police</option>
-                                                            <option value="fire">Fire</option>
-                                                            <option value="medical">Medical</option>
-                                                            <option value="drone">Drone</option>
-                                                        </select>
-                                                        <button
-                                                            disabled={actionLoading}
-                                                            onClick={createAndDispatchNewResource}
-                                                            className="w-full bg-slate-900 py-4 rounded-xl text-white font-black uppercase tracking-[0.3em] text-[10px] hover:bg-black transition-all disabled:opacity-50"
-                                                        >
-                                                            Create + Dispatch
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                        {/* Visual Evidence / Timeline */}
-                        <div className="space-y-8">
-                             <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900">Life Cycle Log</h3>
-                             <div className="space-y-2">
-                                {[
-                                    { t: "09:42 AM", e: "Signal Induction via AI Engine", s: "complete" },
-                                    { t: "10:15 AM", e: "Personnel Relay Assigned: Officer Sarah Chen", s: "complete" },
-                                    { t: "10:30 AM", e: "On-Site Mitigation Protocols Active", s: "active" },
-                                    { t: "11:45 AM", e: "Strategic Resolution & Archive Sync", s: "pending" },
-                                ].map((log, i) => (
-                                    <div key={i} className="flex items-center gap-6 p-6 bg-white border border-border/40 rounded-2xl group hover:border-primary/50 transition-all">
-                                        <div className="w-20 text-[10px] font-black text-slate-400 uppercase tracking-widest">{log.t}</div>
-                                        <div className="w-2.5 h-2.5 rounded-full border-2 border-slate-200 group-hover:border-primary transition-all" />
-                                        <div className="flex-1 text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">{log.e}</div>
-                                        {log.s === 'complete' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                                        {log.s === 'active' && <div className="w-2 h-2 rounded-full bg-primary animate-ping" />}
-                                    </div>
-                                ))}
-                             </div>
+                        <div className="bg-white border border-border/40 rounded-2xl p-8 space-y-5">
+                            <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Assignment Summary</h3>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
+                                Assigned: {getAssignedDisplayNames(selectedReport)}
+                            </p>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
+                                Completed: {selectedReport.status === 'resolved' ? 'Yes' : 'No'}
+                            </p>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
+                                Reported Time: {selectedReport.createdAt ? new Date(selectedReport.createdAt).toLocaleString() : 'N/A'}
+                            </p>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
+                                Last Updated: {selectedReport.updatedAt ? new Date(selectedReport.updatedAt).toLocaleString() : 'N/A'}
+                            </p>
                         </div>
                     </motion.div>
                 ) : (

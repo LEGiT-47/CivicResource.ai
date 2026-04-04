@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ArrowRight, Zap, Globe2, Search, FileText, UserPlus } from "lucide-react";
+import { ArrowRight, Globe2, Search, FileText, UserPlus } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { BrandMark } from "@/components/BrandMark";
 
 type Locale = "english" | "hindi" | "marathi";
 
@@ -48,9 +49,7 @@ export default function Landing() {
       <header className="sticky top-0 z-50 border-b border-border/40 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto max-w-6xl px-6 py-4 flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
-              <Zap className="w-5 h-5 text-white" />
-            </div>
+            <BrandMark className="w-10 h-10 shadow-lg" letterClassName="text-lg" />
             <div>
               <div className="text-lg font-black tracking-tight text-slate-900">CivicFlow Mumbai</div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{text.badge}</div>

@@ -69,29 +69,20 @@ export const assignPersonnel = async (req, res) => {
       return res.status(400).json({ message: 'Personnel is already busy or off-duty' });
     }
 
-    // Type-based validation: check if incident type matches personnel type
-    const typeMapping = {
-      'fire': ['fire'],
-      'medical': ['medical'],
-      'police': ['crime', 'safety', 'traffic', 'crime'],
-      'utility': ['utility', 'infrastructure', 'water'],
-      'sanitation': ['sanitation'],
-      'water': ['water'],
-    };
-
-    const allowedIncidentTypes = typeMapping[personnel.type] || [];
-    if (!allowedIncidentTypes.includes(incident.type)) {
-      return res.status(400).json({
-        message: `Cannot assign ${personnel.type} personnel to ${incident.type} incident`,
-        allowedTypes: allowedIncidentTypes,
-        incidentType: incident.type,
-      });
+    // Assign
+    if (!incident.assignedPersonnel) {
+      incident.assignedPersonnel = personnelId;
     }
 
-    // Assign
-    incident.assignedPersonnel = personnelId;
+    const assignedList = (incident.assignedPersonnelList || []).map((id) => String(id));
+    if (!assignedList.includes(String(personnelId))) {
+      incident.assignedPersonnelList = [...(incident.assignedPersonnelList || []), personnelId];
+    }
+
     incident.dispatchStatus = 'dispatched';
-    incident.status = 'investigating';
+    if (incident.status === 'resolved') {
+      incident.status = 'active';
+    }
     
     personnel.status = 'busy';
     personnel.currentIncident = incidentId;
@@ -114,7 +105,8 @@ export const assignPersonnel = async (req, res) => {
 // @access  Private (Officer)
 export const getAvailablePersonnel = async (req, res) => {
   try {
-    const personnel = await Personnel.find({ status: 'available' });
+    const includeAll = String(req.query.all || '').toLowerCase() === 'true';
+    const personnel = includeAll ? await Personnel.find({}) : await Personnel.find({ status: 'available' });
     res.json(personnel);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -140,7 +132,7 @@ export const getWorkerAssignmentsByUnitId = async (req, res) => {
     }
 
     const assignedIncidents = await Incident.find({
-      assignedPersonnel: personnel._id,
+      $or: [{ assignedPersonnel: personnel._id }, { assignedPersonnelList: personnel._id }],
       status: { $ne: 'resolved' },
     })
       .sort({ updatedAt: -1 })
@@ -177,11 +169,11 @@ export const getMyAssignments = async (req, res) => {
     }
 
     if (!personnel) {
-      return res.status(404).json({ message: 'Personnel profile not found for this worker account' });
+      return res.json([]);
     }
 
     const incidents = await Incident.find({
-      assignedPersonnel: personnel._id,
+      $or: [{ assignedPersonnel: personnel._id }, { assignedPersonnelList: personnel._id }],
     })
       .populate('assignedPersonnel', 'name type contact status location')
       .sort({ updatedAt: -1 })

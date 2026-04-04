@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
-  Zap, ArrowRight, Mail, Lock, User, 
+   ArrowRight, Mail, Lock, User, 
   ShieldCheck, Activity, Globe2, ChevronLeft,
   Building2
 } from "lucide-react";
@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { normalizeRole } from "@/lib/session";
+import { BrandMark } from "@/components/BrandMark";
 
 export default function Signup() {
   const [formData, setFormData] = useState({
@@ -64,9 +65,7 @@ export default function Signup() {
         
         <div className="max-w-md w-full mx-auto flex-1 flex flex-col justify-center">
             <div className="flex items-center gap-4 mb-12 shrink-0">
-               <div className="w-12 h-12 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/20">
-                  <Zap className="w-6 h-6 text-white" />
-               </div>
+               <BrandMark className="w-12 h-12 shadow-2xl" letterClassName="text-2xl" />
                <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicFlow</span>
             </div>
 

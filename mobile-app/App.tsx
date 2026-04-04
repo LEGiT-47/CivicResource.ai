@@ -10,12 +10,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import MapView, { Marker, type MapPressEvent } from 'react-native-maps';
 import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
 
 import { tr } from './src/i18n';
 import { api, withAuthHeader } from './src/services/api';
-import { getCurrentLocation } from './src/services/location';
+import { getAddressFromCoordinates, getCurrentLocation } from './src/services/location';
 import { normalizeText } from './src/services/nlp';
 import { ensureNotificationPermission, sendLocalNotification } from './src/services/notifications';
 import {
@@ -56,6 +57,13 @@ export default function App() {
   const [address, setAddress] = useState('');
   const [lat, setLat] = useState<number | undefined>();
   const [lng, setLng] = useState<number | undefined>();
+  const [showMapPicker, setShowMapPicker] = useState(false);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 19.076,
+    longitude: 72.8777,
+    latitudeDelta: 0.08,
+    longitudeDelta: 0.08,
+  });
   const [submitLoading, setSubmitLoading] = useState(false);
   const [lastTrackingId, setLastTrackingId] = useState('');
 
@@ -121,6 +129,31 @@ export default function App() {
     setAddress(current.address);
     setLat(current.lat);
     setLng(current.lng);
+    setMapRegion((prev) => ({
+      ...prev,
+      latitude: current.lat,
+      longitude: current.lng,
+    }));
+  };
+
+  const pickLocationFromMap = async (event: MapPressEvent) => {
+    const pickedLat = event.nativeEvent.coordinate.latitude;
+    const pickedLng = event.nativeEvent.coordinate.longitude;
+
+    setLat(pickedLat);
+    setLng(pickedLng);
+    setMapRegion((prev) => ({
+      ...prev,
+      latitude: pickedLat,
+      longitude: pickedLng,
+    }));
+
+    try {
+      const resolvedAddress = await getAddressFromCoordinates(pickedLat, pickedLng);
+      setAddress(resolvedAddress || `${pickedLat.toFixed(5)}, ${pickedLng.toFixed(5)}`);
+    } catch {
+      setAddress(`${pickedLat.toFixed(5)}, ${pickedLng.toFixed(5)}`);
+    }
   };
 
   const submitComplaint = async () => {
@@ -419,6 +452,19 @@ export default function App() {
               <Text style={styles.secondaryBtnText}>{t('useLocation')}</Text>
             </Pressable>
 
+            <Pressable style={styles.secondaryOutlineBtn} onPress={() => setShowMapPicker((v) => !v)}>
+              <Text style={styles.secondaryOutlineBtnText}>{showMapPicker ? 'Hide Map Picker' : 'Pick Location on Map'}</Text>
+            </Pressable>
+
+            {showMapPicker ? (
+              <View style={styles.mapWrapper}>
+                <MapView style={styles.map} initialRegion={mapRegion} region={mapRegion} onPress={pickLocationFromMap}>
+                  {lat != null && lng != null ? <Marker coordinate={{ latitude: lat, longitude: lng }} /> : null}
+                </MapView>
+                <Text style={styles.mapHint}>Tap on map to pin complaint location.</Text>
+              </View>
+            ) : null}
+
             <Pressable style={styles.primaryBtn} onPress={submitComplaint} disabled={submitLoading}>
               {submitLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>{t('submit')}</Text>}
             </Pressable>
@@ -630,6 +676,36 @@ const styles = StyleSheet.create({
   secondaryBtnText: {
     color: '#fff',
     fontWeight: '800',
+  },
+  secondaryOutlineBtn: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fb923c',
+    borderWidth: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  secondaryOutlineBtnText: {
+    color: '#c2410c',
+    fontWeight: '800',
+  },
+  mapWrapper: {
+    borderColor: '#cbd5e1',
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: '#f8fafc',
+  },
+  map: {
+    width: '100%',
+    height: 240,
+  },
+  mapHint: {
+    color: '#475569',
+    fontSize: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    fontWeight: '600',
   },
   badge: {
     fontWeight: '700',
