@@ -1,30 +1,1001 @@
 text,intent,is_fake
-"Water shortage in my apartment block for two days","water",0
-"No tanker arrived in our ward and taps are dry","water",0
-"Low water pressure and supply failure near the colony","water",0
-"Garbage overflowing from bins behind the market","garbage",0
-"Trash collection missed for three mornings","garbage",0
-"Smelly waste pileup outside the school gate","garbage",0
-"Deep pothole on the road near the signal","roads",0
-"Broken street and damaged road surface causing accidents","roads",0
-"Road blockage after heavy rain needs repair","roads",0
-"Open drain and sewer damage on the lane","maintenance",0
-"Streetlight is broken and needs maintenance","maintenance",0
-"Repair the drainage cover near the junction","maintenance",0
-"Transformer trip and power outage in the block","utility",0
-"Electricity fault with repeated voltage drops","utility",0
-"Water pump and utility line failure in the area","utility",0
-"Suspicious person threatening residents near the park","safety",0
-"Fire risk in the building stairwell","safety",0
-"Unsafe crowd and fight outside the station","safety",0
-"General civic issue in the neighborhood","general",0
-"Need help with a municipal problem at this address","general",0
-"Public complaint about a service issue","general",0
-"test test test","general",1
-"hello world","general",1
-"dummy report please ignore","general",1
-"buy now limited offer","general",1
-"asdf qwer zxcv","general",1
-"this is fake complaint data","general",1
-"call me back for prize money","general",1
-"lorem ipsum dolor sit amet","general",1
+Public inquiry regarding site development at Public Hospital,general,0
+Dead animal carcass on the road in Green Park,garbage,0
+Feedback on the new park in Green Park,general,0
+"Dirty water supply in Green Park, please check",water,0
+Public inquiry regarding site development at Police Chowki,general,0
+Illegal dumping behind the Silver Towers,garbage,0
+Transformer spark and fire risk near High School,utility,0
+testing the system,general,1
+Contaminated water from the main line in Green Park,water,0
+Transformer spark and fire risk near Main Junction,utility,0
+Water shortage in Sector 12 for 6 days,water,0
+Power outage in Green Park since 5 PM,utility,0
+Streetlight not working for the entire lane at City Center,utility,0
+Broken dividers on the main road at Lakeview,roads,0
+Public inquiry regarding site development at Central Station,general,0
+free gift click here,general,1
+Illegal dumping behind the Galaxy Apartments,garbage,0
+Public inquiry regarding site development at High School,general,0
+sample data for triage,general,1
+Public inquiry regarding site development at Public Hospital,general,0
+General civic issue report for Green Park,general,0
+Garbage not collected for 8 days in Sector 12,garbage,0
+Requesting information about municipal taxes,general,0
+Streetlight dark zone making it unsafe near Main Junction,safety,0
+Overflowing bins at Green Park market,garbage,0
+New road cracking after 8 weeks of usage,roads,0
+Maintenance needed for the bridge at Grand Mall,maintenance,0
+Damaged road surface near Sector 12 station,roads,0
+Waste collection truck missed our ward 7,garbage,0
+Deep pothole at Police Chowki junction,roads,0
+asdf qwer zxcv,general,1
+Water shortage in Railway Colony for 8 days,water,0
+Requesting information about municipal taxes,general,0
+Open drain near the school at Green Park,maintenance,0
+Contaminated water from the main line in Lakeview,water,0
+Feedback on the new park in Industrial Area,general,0
+General civic issue report for Lakeview,general,0
+test test test 123,general,1
+sample data for triage,general,1
+test test test 123,general,1
+asdf qwer zxcv,general,1
+Garbage not collected for 8 days in Industrial Area,garbage,0
+Garbage not collected for 8 days in Lakeview,garbage,0
+free gift click here,general,1
+No water tanker arrived today at Market Road,water,0
+sample data for triage,general,1
+Public inquiry regarding site development at Grand Mall,general,0
+Clogged gutter causing street flooding,maintenance,0
+Garbage not collected for 6 days in Railway Colony,garbage,0
+dummy report please ignore,general,1
+Transformer spark and fire risk near Public Hospital,utility,0
+Overflowing bins at Market Road market,garbage,0
+Clogged gutter causing street flooding,maintenance,0
+Requesting information about municipal taxes,general,0
+Feedback on the new park in Railway Colony,general,0
+Garbage not collected for 1 days in Green Park,garbage,0
+Streetlight not working for the entire lane at Green Park,utility,0
+No security patrol visible in Lakeview for weeks,safety,0
+Public park fence damaged at Railway Colony,maintenance,0
+New road cracking after 8 weeks of usage,roads,0
+Dead animal carcass on the road in Sector 12,garbage,0
+Damaged road surface near Market Road station,roads,0
+free gift click here,general,1
+Fire hazard due to chemicals stored at Police Chowki,safety,0
+Contaminated water from the main line in Green Park,water,0
+Overhanging electrical wires near Commercial Plaza,utility,0
+Low water pressure and dry taps for 9 hours,water,0
+Transformer spark and fire risk near Grand Mall,utility,0
+Overhanging electrical wires near Community Hall,utility,0
+Stinking waste pileup near Grand Mall,garbage,0
+Maintenance needed for the bridge at Public Hospital,maintenance,0
+Unpaved street in Sector 12 causing dust issues,roads,0
+Requesting information about municipal taxes,general,0
+Clogged gutter causing street flooding,maintenance,0
+Clogged gutter causing street flooding,maintenance,0
+Open drain near the school at Green Park,maintenance,0
+dummy report please ignore,general,1
+Gas pipeline repair needed at Industrial Area,utility,0
+Dead animal carcass on the road in Sector 12,garbage,0
+Empty property being used for illegal activities in Market Road,safety,0
+asdf qwer zxcv,general,1
+Feedback on the new park in City Center,general,0
+Garbage not collected for 9 days in Lakeview,garbage,0
+General civic issue report for Lakeview,general,0
+test test test 123,general,1
+Suspicious crowd gathered near Silver Towers,safety,0
+ignore this,general,1
+Overflowing bins at Green Park market,garbage,0
+Broken dividers on the main road at City Center,roads,0
+Maintenance needed for the bridge at Main Junction,maintenance,0
+Deep pothole at Public Hospital junction,roads,0
+free gift click here,general,1
+Streetlight dark zone making it unsafe near High School,safety,0
+Dead animal carcass on the road in Railway Colony,garbage,0
+Streetlight dark zone making it unsafe near Central Station,safety,0
+Feedback on the new park in Green Park,general,0
+General civic issue report for Lakeview,general,0
+Waste collection truck missed our ward 8,garbage,0
+Maintenance needed for the bridge at Central Station,maintenance,0
+Pipeline leakage near Main Junction causing water waste,water,0
+Transformer spark and fire risk near High School,utility,0
+Utility line burst causing road flooding in Lakeview,utility,0
+Unpaved street in Lakeview causing dust issues,roads,0
+Emergency exit blocked in the complex at Green Park,safety,0
+Clogged gutter causing street flooding,maintenance,0
+Public inquiry regarding site development at Main Junction,general,0
+Low water pressure and dry taps for 4 hours,water,0
+Power outage in Industrial Area since 8 PM,utility,0
+ignore this,general,1
+Public inquiry regarding site development at Grand Mall,general,0
+ignore this,general,1
+Maintenance needed for the bridge at High School,maintenance,0
+ignore this,general,1
+No security patrol visible in Railway Colony for weeks,safety,0
+No security patrol visible in Industrial Area for weeks,safety,0
+Low water pressure and dry taps for 6 hours,water,0
+Pipeline leakage near Central Station causing water waste,water,0
+test test test 123,general,1
+Overflowing bins at City Center market,garbage,0
+Streetlight dark zone making it unsafe near High School,safety,0
+free gift click here,general,1
+Gas pipeline repair needed at Green Park,utility,0
+Streetlight not working for the entire lane at Lakeview,utility,0
+Unpaved street in Railway Colony causing dust issues,roads,0
+lorem ipsum dolor sit amet,general,1
+Unpaved street in Lakeview causing dust issues,roads,0
+Broken dividers on the main road at Green Park,roads,0
+Water shortage in Sector 12 for 9 days,water,0
+Streetlight not working for the entire lane at Sector 12,utility,0
+Illegal dumping behind the Old Factory,garbage,0
+sample data for triage,general,1
+spam buy now,general,1
+Garbage not collected for 7 days in Lakeview,garbage,0
+Public park fence damaged at Green Park,maintenance,0
+Requesting information about municipal taxes,general,0
+Power outage in Green Park since 10 PM,utility,0
+Empty property being used for illegal activities in Lakeview,safety,0
+spam buy now,general,1
+Feedback on the new park in Green Park,general,0
+Streetlight not working for the entire lane at Green Park,utility,0
+Broken manhole cover near Police Chowki,maintenance,0
+Deep pothole at High School junction,roads,0
+Dead animal carcass on the road in Industrial Area,garbage,0
+Garbage not collected for 6 days in Market Road,garbage,0
+hello world,general,1
+test test test 123,general,1
+Utility line burst causing road flooding in Sector 12,utility,0
+sample data for triage,general,1
+Pipeline leakage near High School causing water waste,water,0
+New road cracking after 7 weeks of usage,roads,0
+No water tanker arrived today at City Center,water,0
+Requesting information about municipal taxes,general,0
+test test test 123,general,1
+Feedback on the new park in Railway Colony,general,0
+Public inquiry regarding site development at Police Chowki,general,0
+Clogged gutter causing street flooding,maintenance,0
+Low water pressure and dry taps for 8 hours,water,0
+Transformer spark and fire risk near High School,utility,0
+General civic issue report for Railway Colony,general,0
+Gas pipeline repair needed at Sector 12,utility,0
+Waste collection truck missed our ward 6,garbage,0
+Pipeline leakage near Central Station causing water waste,water,0
+Water shortage in City Center for 3 days,water,0
+Low water pressure and dry taps for 8 hours,water,0
+Public inquiry regarding site development at Police Chowki,general,0
+ignore this,general,1
+Fire hazard due to chemicals stored at Public Hospital,safety,0
+Open drain near the school at Sector 12,maintenance,0
+Feedback on the new park in Railway Colony,general,0
+Open drain near the school at City Center,maintenance,0
+"Dirty water supply in City Center, please check",water,0
+Illegal dumping behind the Community Hall,garbage,0
+Streetlight dark zone making it unsafe near Central Station,safety,0
+Dead animal carcass on the road in Lakeview,garbage,0
+Empty property being used for illegal activities in Market Road,safety,0
+Streetlight dark zone making it unsafe near Public Hospital,safety,0
+Open drain near the school at Lakeview,maintenance,0
+Overhanging electrical wires near Community Hall,utility,0
+New road cracking after 1 weeks of usage,roads,0
+Streetlight not working for the entire lane at Sector 12,utility,0
+No water tanker arrived today at Market Road,water,0
+Public inquiry regarding site development at Grand Mall,general,0
+Stinking waste pileup near Grand Mall,garbage,0
+Transformer spark and fire risk near Police Chowki,utility,0
+Signal failure and road blockage at Central Station,roads,0
+Emergency exit blocked in the complex at City Center,safety,0
+Stinking waste pileup near Police Chowki,garbage,0
+Public inquiry regarding site development at Police Chowki,general,0
+Stinking waste pileup near Main Junction,garbage,0
+Dead animal carcass on the road in Industrial Area,garbage,0
+Emergency exit blocked in the complex at Industrial Area,safety,0
+Streetlight not working for the entire lane at Lakeview,utility,0
+"Dirty water supply in Green Park, please check",water,0
+Gas pipeline repair needed at Green Park,utility,0
+Overflowing bins at Railway Colony market,garbage,0
+Fire hazard due to chemicals stored at Central Station,safety,0
+Empty property being used for illegal activities in Lakeview,safety,0
+Pipeline leakage near Police Chowki causing water waste,water,0
+Waste collection truck missed our ward 4,garbage,0
+General civic issue report for Market Road,general,0
+Illegal dumping behind the Silver Towers,garbage,0
+testing the system,general,1
+Public park fence damaged at Lakeview,maintenance,0
+Water shortage in Railway Colony for 10 days,water,0
+Deep pothole at Public Hospital junction,roads,0
+Dead animal carcass on the road in Railway Colony,garbage,0
+New road cracking after 4 weeks of usage,roads,0
+Damaged road surface near Market Road station,roads,0
+Dead animal carcass on the road in Market Road,garbage,0
+Damaged road surface near Lakeview station,roads,0
+Sewer blockage and overflow on Street 36,maintenance,0
+Deep pothole at Public Hospital junction,roads,0
+Low water pressure and dry taps for 3 hours,water,0
+Dead animal carcass on the road in Railway Colony,garbage,0
+free gift click here,general,1
+lorem ipsum dolor sit amet,general,1
+lorem ipsum dolor sit amet,general,1
+Garbage not collected for 1 days in City Center,garbage,0
+asdf qwer zxcv,general,1
+Overhanging electrical wires near Commercial Plaza,utility,0
+Emergency exit blocked in the complex at City Center,safety,0
+Contaminated water from the main line in Railway Colony,water,0
+Overflowing bins at Market Road market,garbage,0
+New road cracking after 4 weeks of usage,roads,0
+Fire hazard due to chemicals stored at Police Chowki,safety,0
+Streetlight dark zone making it unsafe near Public Hospital,safety,0
+Requesting information about municipal taxes,general,0
+Signal failure and road blockage at Police Chowki,roads,0
+No security patrol visible in Sector 12 for weeks,safety,0
+Fire hazard due to chemicals stored at Main Junction,safety,0
+Empty property being used for illegal activities in Green Park,safety,0
+General civic issue report for Lakeview,general,0
+General civic issue report for Market Road,general,0
+No security patrol visible in Green Park for weeks,safety,0
+Streetlight dark zone making it unsafe near Grand Mall,safety,0
+Suspicious crowd gathered near Silver Towers,safety,0
+Dead animal carcass on the road in Industrial Area,garbage,0
+Low water pressure and dry taps for 10 hours,water,0
+General civic issue report for Industrial Area,general,0
+No security patrol visible in Green Park for weeks,safety,0
+Overhanging electrical wires near Community Hall,utility,0
+lorem ipsum dolor sit amet,general,1
+General civic issue report for Sector 12,general,0
+Transformer spark and fire risk near High School,utility,0
+Fire hazard due to chemicals stored at Main Junction,safety,0
+test test test 123,general,1
+Public park fence damaged at City Center,maintenance,0
+Signal failure and road blockage at Police Chowki,roads,0
+Emergency exit blocked in the complex at Railway Colony,safety,0
+Dead animal carcass on the road in City Center,garbage,0
+Low water pressure and dry taps for 2 hours,water,0
+Streetlight dark zone making it unsafe near Public Hospital,safety,0
+Broken manhole cover near Main Junction,maintenance,0
+Broken dividers on the main road at Sector 12,roads,0
+Broken dividers on the main road at Sector 12,roads,0
+Unpaved street in Industrial Area causing dust issues,roads,0
+Empty property being used for illegal activities in Lakeview,safety,0
+hello world,general,1
+Public park fence damaged at Industrial Area,maintenance,0
+Power outage in Market Road since 6 PM,utility,0
+Garbage not collected for 9 days in Industrial Area,garbage,0
+Unpaved street in Market Road causing dust issues,roads,0
+Public park fence damaged at Industrial Area,maintenance,0
+Unpaved street in Lakeview causing dust issues,roads,0
+Dead animal carcass on the road in Railway Colony,garbage,0
+free gift click here,general,1
+Sewer blockage and overflow on Street 36,maintenance,0
+sample data for triage,general,1
+"Dirty water supply in Railway Colony, please check",water,0
+free gift click here,general,1
+Broken dividers on the main road at Green Park,roads,0
+Emergency exit blocked in the complex at Lakeview,safety,0
+dummy report please ignore,general,1
+Gas pipeline repair needed at Industrial Area,utility,0
+Garbage not collected for 5 days in City Center,garbage,0
+No water tanker arrived today at Sector 12,water,0
+Public inquiry regarding site development at Police Chowki,general,0
+Suspicious crowd gathered near Commercial Plaza,safety,0
+test test test 123,general,1
+General civic issue report for Industrial Area,general,0
+Waste collection truck missed our ward 1,garbage,0
+Empty property being used for illegal activities in Sector 12,safety,0
+Garbage not collected for 8 days in Sector 12,garbage,0
+Public inquiry regarding site development at Central Station,general,0
+No security patrol visible in Green Park for weeks,safety,0
+Damaged road surface near Sector 12 station,roads,0
+No security patrol visible in Market Road for weeks,safety,0
+Broken dividers on the main road at Sector 12,roads,0
+No security patrol visible in Industrial Area for weeks,safety,0
+Utility line burst causing road flooding in Industrial Area,utility,0
+Broken manhole cover near High School,maintenance,0
+Overhanging electrical wires near Silver Towers,utility,0
+Power outage in Market Road since 5 PM,utility,0
+hello world,general,1
+Low water pressure and dry taps for 5 hours,water,0
+Unpaved street in City Center causing dust issues,roads,0
+Open drain near the school at Sector 12,maintenance,0
+New road cracking after 8 weeks of usage,roads,0
+spam buy now,general,1
+"Dirty water supply in Sector 12, please check",water,0
+"Dirty water supply in Sector 12, please check",water,0
+General civic issue report for Market Road,general,0
+No security patrol visible in Sector 12 for weeks,safety,0
+Unpaved street in Industrial Area causing dust issues,roads,0
+Contaminated water from the main line in Industrial Area,water,0
+testing the system,general,1
+lorem ipsum dolor sit amet,general,1
+Overflowing bins at Lakeview market,garbage,0
+Suspicious crowd gathered near Community Hall,safety,0
+Overhanging electrical wires near Commercial Plaza,utility,0
+asdf qwer zxcv,general,1
+free gift click here,general,1
+"Dirty water supply in Lakeview, please check",water,0
+Clogged gutter causing street flooding,maintenance,0
+Open drain near the school at Industrial Area,maintenance,0
+Sewer blockage and overflow on Street 82,maintenance,0
+Dead animal carcass on the road in Market Road,garbage,0
+Power outage in Lakeview since 1 PM,utility,0
+Sewer blockage and overflow on Street 81,maintenance,0
+Illegal dumping behind the Silver Towers,garbage,0
+Requesting information about municipal taxes,general,0
+Broken manhole cover near Central Station,maintenance,0
+Unpaved street in Green Park causing dust issues,roads,0
+Contaminated water from the main line in Sector 12,water,0
+General civic issue report for Market Road,general,0
+Feedback on the new park in Industrial Area,general,0
+Maintenance needed for the bridge at Central Station,maintenance,0
+Feedback on the new park in Lakeview,general,0
+Suspicious crowd gathered near Galaxy Apartments,safety,0
+Unpaved street in City Center causing dust issues,roads,0
+Water shortage in Industrial Area for 9 days,water,0
+Feedback on the new park in Industrial Area,general,0
+Feedback on the new park in Lakeview,general,0
+No water tanker arrived today at Sector 12,water,0
+Sewer blockage and overflow on Street 96,maintenance,0
+Contaminated water from the main line in Sector 12,water,0
+Maintenance needed for the bridge at Central Station,maintenance,0
+Deep pothole at Main Junction junction,roads,0
+Waste collection truck missed our ward 8,garbage,0
+Dead animal carcass on the road in Market Road,garbage,0
+ignore this,general,1
+Requesting information about municipal taxes,general,0
+Maintenance needed for the bridge at Main Junction,maintenance,0
+Signal failure and road blockage at Public Hospital,roads,0
+free gift click here,general,1
+General civic issue report for Lakeview,general,0
+Streetlight not working for the entire lane at City Center,utility,0
+Broken dividers on the main road at Railway Colony,roads,0
+Deep pothole at Central Station junction,roads,0
+Transformer spark and fire risk near Grand Mall,utility,0
+Feedback on the new park in Market Road,general,0
+Broken manhole cover near Police Chowki,maintenance,0
+Broken manhole cover near Grand Mall,maintenance,0
+Requesting information about municipal taxes,general,0
+General civic issue report for City Center,general,0
+Clogged gutter causing street flooding,maintenance,0
+Streetlight dark zone making it unsafe near Grand Mall,safety,0
+Overhanging electrical wires near Galaxy Apartments,utility,0
+Requesting information about municipal taxes,general,0
+General civic issue report for Railway Colony,general,0
+Streetlight dark zone making it unsafe near Police Chowki,safety,0
+Signal failure and road blockage at Main Junction,roads,0
+Low water pressure and dry taps for 6 hours,water,0
+Stinking waste pileup near Main Junction,garbage,0
+"Dirty water supply in Railway Colony, please check",water,0
+Utility line burst causing road flooding in Lakeview,utility,0
+asdf qwer zxcv,general,1
+Contaminated water from the main line in Sector 12,water,0
+Garbage not collected for 8 days in Railway Colony,garbage,0
+Broken manhole cover near Police Chowki,maintenance,0
+Overhanging electrical wires near Old Factory,utility,0
+Water shortage in Industrial Area for 9 days,water,0
+Contaminated water from the main line in Market Road,water,0
+Waste collection truck missed our ward 10,garbage,0
+lorem ipsum dolor sit amet,general,1
+Dead animal carcass on the road in City Center,garbage,0
+Broken manhole cover near High School,maintenance,0
+ignore this,general,1
+Gas pipeline repair needed at Market Road,utility,0
+Public inquiry regarding site development at Public Hospital,general,0
+Fire hazard due to chemicals stored at Main Junction,safety,0
+Gas pipeline repair needed at Market Road,utility,0
+Requesting information about municipal taxes,general,0
+Empty property being used for illegal activities in Green Park,safety,0
+Maintenance needed for the bridge at Grand Mall,maintenance,0
+hello world,general,1
+dummy report please ignore,general,1
+testing the system,general,1
+Requesting information about municipal taxes,general,0
+No water tanker arrived today at Green Park,water,0
+Public park fence damaged at Railway Colony,maintenance,0
+Maintenance needed for the bridge at Public Hospital,maintenance,0
+sample data for triage,general,1
+Water shortage in Lakeview for 5 days,water,0
+lorem ipsum dolor sit amet,general,1
+Unpaved street in Railway Colony causing dust issues,roads,0
+asdf qwer zxcv,general,1
+free gift click here,general,1
+"Dirty water supply in Green Park, please check",water,0
+Requesting information about municipal taxes,general,0
+Contaminated water from the main line in Sector 12,water,0
+Fire hazard due to chemicals stored at Police Chowki,safety,0
+"Dirty water supply in Lakeview, please check",water,0
+Damaged road surface near Market Road station,roads,0
+spam buy now,general,1
+No security patrol visible in Lakeview for weeks,safety,0
+Low water pressure and dry taps for 9 hours,water,0
+Damaged road surface near Sector 12 station,roads,0
+No security patrol visible in Market Road for weeks,safety,0
+Stinking waste pileup near Police Chowki,garbage,0
+Transformer spark and fire risk near Main Junction,utility,0
+Gas pipeline repair needed at City Center,utility,0
+Sewer blockage and overflow on Street 69,maintenance,0
+Low water pressure and dry taps for 3 hours,water,0
+Empty property being used for illegal activities in Industrial Area,safety,0
+Dead animal carcass on the road in Market Road,garbage,0
+Water shortage in Railway Colony for 5 days,water,0
+Gas pipeline repair needed at City Center,utility,0
+sample data for triage,general,1
+Overflowing bins at Green Park market,garbage,0
+Empty property being used for illegal activities in Green Park,safety,0
+Streetlight not working for the entire lane at Sector 12,utility,0
+Signal failure and road blockage at Public Hospital,roads,0
+free gift click here,general,1
+Stinking waste pileup near Central Station,garbage,0
+"Dirty water supply in City Center, please check",water,0
+Streetlight dark zone making it unsafe near Central Station,safety,0
+"Dirty water supply in Lakeview, please check",water,0
+Broken dividers on the main road at Green Park,roads,0
+Low water pressure and dry taps for 2 hours,water,0
+Deep pothole at Main Junction junction,roads,0
+Fire hazard due to chemicals stored at Police Chowki,safety,0
+Gas pipeline repair needed at City Center,utility,0
+Emergency exit blocked in the complex at Railway Colony,safety,0
+Overflowing bins at Sector 12 market,garbage,0
+Suspicious crowd gathered near Old Factory,safety,0
+Suspicious crowd gathered near Galaxy Apartments,safety,0
+Suspicious crowd gathered near Old Factory,safety,0
+Signal failure and road blockage at Central Station,roads,0
+Streetlight not working for the entire lane at Green Park,utility,0
+Requesting information about municipal taxes,general,0
+Public park fence damaged at Market Road,maintenance,0
+sample data for triage,general,1
+Gas pipeline repair needed at Railway Colony,utility,0
+Stinking waste pileup near Public Hospital,garbage,0
+Deep pothole at Grand Mall junction,roads,0
+asdf qwer zxcv,general,1
+Gas pipeline repair needed at Railway Colony,utility,0
+hello world,general,1
+ignore this,general,1
+Broken dividers on the main road at Market Road,roads,0
+asdf qwer zxcv,general,1
+Unpaved street in Market Road causing dust issues,roads,0
+Overflowing bins at Lakeview market,garbage,0
+Unpaved street in Market Road causing dust issues,roads,0
+Damaged road surface near Market Road station,roads,0
+Illegal dumping behind the Community Hall,garbage,0
+Requesting information about municipal taxes,general,0
+Broken manhole cover near High School,maintenance,0
+Waste collection truck missed our ward 4,garbage,0
+Feedback on the new park in Market Road,general,0
+No water tanker arrived today at Industrial Area,water,0
+Streetlight not working for the entire lane at Railway Colony,utility,0
+Open drain near the school at Market Road,maintenance,0
+No water tanker arrived today at Market Road,water,0
+Dead animal carcass on the road in Sector 12,garbage,0
+Illegal dumping behind the Silver Towers,garbage,0
+Empty property being used for illegal activities in Green Park,safety,0
+Damaged road surface near Sector 12 station,roads,0
+spam buy now,general,1
+Streetlight not working for the entire lane at City Center,utility,0
+spam buy now,general,1
+Transformer spark and fire risk near Public Hospital,utility,0
+Stinking waste pileup near Central Station,garbage,0
+Signal failure and road blockage at High School,roads,0
+Clogged gutter causing street flooding,maintenance,0
+Unpaved street in Green Park causing dust issues,roads,0
+Suspicious crowd gathered near Old Factory,safety,0
+Transformer spark and fire risk near Main Junction,utility,0
+Feedback on the new park in Sector 12,general,0
+Overflowing bins at Industrial Area market,garbage,0
+Overflowing bins at Lakeview market,garbage,0
+No security patrol visible in Railway Colony for weeks,safety,0
+Feedback on the new park in Market Road,general,0
+Signal failure and road blockage at Grand Mall,roads,0
+Broken manhole cover near Central Station,maintenance,0
+Contaminated water from the main line in Green Park,water,0
+dummy report please ignore,general,1
+Feedback on the new park in Lakeview,general,0
+Dead animal carcass on the road in Market Road,garbage,0
+Damaged road surface near City Center station,roads,0
+"Dirty water supply in City Center, please check",water,0
+Low water pressure and dry taps for 4 hours,water,0
+Public inquiry regarding site development at High School,general,0
+Waste collection truck missed our ward 8,garbage,0
+Empty property being used for illegal activities in Sector 12,safety,0
+Gas pipeline repair needed at Railway Colony,utility,0
+Power outage in Industrial Area since 9 PM,utility,0
+Sewer blockage and overflow on Street 79,maintenance,0
+Contaminated water from the main line in City Center,water,0
+Open drain near the school at Market Road,maintenance,0
+Utility line burst causing road flooding in Sector 12,utility,0
+Empty property being used for illegal activities in Railway Colony,safety,0
+Pipeline leakage near Central Station causing water waste,water,0
+dummy report please ignore,general,1
+Unpaved street in Industrial Area causing dust issues,roads,0
+Requesting information about municipal taxes,general,0
+Utility line burst causing road flooding in Market Road,utility,0
+Public inquiry regarding site development at Police Chowki,general,0
+Broken manhole cover near Public Hospital,maintenance,0
+Fire hazard due to chemicals stored at Central Station,safety,0
+Feedback on the new park in Industrial Area,general,0
+Empty property being used for illegal activities in Railway Colony,safety,0
+"Dirty water supply in Industrial Area, please check",water,0
+Waste collection truck missed our ward 3,garbage,0
+No security patrol visible in City Center for weeks,safety,0
+Signal failure and road blockage at Public Hospital,roads,0
+Power outage in Industrial Area since 9 PM,utility,0
+Deep pothole at Police Chowki junction,roads,0
+Contaminated water from the main line in Sector 12,water,0
+Dead animal carcass on the road in Sector 12,garbage,0
+Streetlight not working for the entire lane at Green Park,utility,0
+Fire hazard due to chemicals stored at High School,safety,0
+Damaged road surface near Industrial Area station,roads,0
+Clogged gutter causing street flooding,maintenance,0
+Waste collection truck missed our ward 5,garbage,0
+Sewer blockage and overflow on Street 65,maintenance,0
+Overhanging electrical wires near Community Hall,utility,0
+Suspicious crowd gathered near Galaxy Apartments,safety,0
+New road cracking after 8 weeks of usage,roads,0
+Requesting information about municipal taxes,general,0
+Feedback on the new park in Railway Colony,general,0
+free gift click here,general,1
+Fire hazard due to chemicals stored at Main Junction,safety,0
+testing the system,general,1
+ignore this,general,1
+Illegal dumping behind the Community Hall,garbage,0
+asdf qwer zxcv,general,1
+Water shortage in Industrial Area for 4 days,water,0
+Public park fence damaged at Green Park,maintenance,0
+Suspicious crowd gathered near Commercial Plaza,safety,0
+Open drain near the school at Sector 12,maintenance,0
+Damaged road surface near Green Park station,roads,0
+Power outage in Industrial Area since 1 PM,utility,0
+Gas pipeline repair needed at Sector 12,utility,0
+"Dirty water supply in Sector 12, please check",water,0
+Feedback on the new park in Market Road,general,0
+hello world,general,1
+Contaminated water from the main line in Sector 12,water,0
+General civic issue report for City Center,general,0
+Garbage not collected for 8 days in Industrial Area,garbage,0
+Low water pressure and dry taps for 2 hours,water,0
+Overhanging electrical wires near Galaxy Apartments,utility,0
+Garbage not collected for 9 days in Industrial Area,garbage,0
+Pipeline leakage near Main Junction causing water waste,water,0
+Emergency exit blocked in the complex at Market Road,safety,0
+spam buy now,general,1
+Power outage in Market Road since 3 PM,utility,0
+Damaged road surface near City Center station,roads,0
+"Dirty water supply in Railway Colony, please check",water,0
+Streetlight not working for the entire lane at Market Road,utility,0
+Gas pipeline repair needed at Green Park,utility,0
+Clogged gutter causing street flooding,maintenance,0
+Transformer spark and fire risk near Central Station,utility,0
+Low water pressure and dry taps for 9 hours,water,0
+Maintenance needed for the bridge at Central Station,maintenance,0
+Public inquiry regarding site development at High School,general,0
+Deep pothole at Police Chowki junction,roads,0
+Broken manhole cover near Central Station,maintenance,0
+Water shortage in Railway Colony for 6 days,water,0
+Sewer blockage and overflow on Street 84,maintenance,0
+General civic issue report for City Center,general,0
+Illegal dumping behind the Commercial Plaza,garbage,0
+Unpaved street in Sector 12 causing dust issues,roads,0
+Utility line burst causing road flooding in Railway Colony,utility,0
+Open drain near the school at Sector 12,maintenance,0
+free gift click here,general,1
+Damaged road surface near Railway Colony station,roads,0
+General civic issue report for Sector 12,general,0
+Dead animal carcass on the road in Railway Colony,garbage,0
+Dead animal carcass on the road in Sector 12,garbage,0
+Maintenance needed for the bridge at Central Station,maintenance,0
+Suspicious crowd gathered near Silver Towers,safety,0
+Maintenance needed for the bridge at Grand Mall,maintenance,0
+No security patrol visible in Railway Colony for weeks,safety,0
+Pipeline leakage near Central Station causing water waste,water,0
+Garbage not collected for 9 days in Lakeview,garbage,0
+Low water pressure and dry taps for 6 hours,water,0
+Public inquiry regarding site development at Public Hospital,general,0
+Signal failure and road blockage at Grand Mall,roads,0
+Damaged road surface near Sector 12 station,roads,0
+General civic issue report for Lakeview,general,0
+General civic issue report for Industrial Area,general,0
+Signal failure and road blockage at Police Chowki,roads,0
+Stinking waste pileup near Main Junction,garbage,0
+Power outage in City Center since 8 PM,utility,0
+hello world,general,1
+Gas pipeline repair needed at Industrial Area,utility,0
+Water shortage in Market Road for 3 days,water,0
+Water shortage in City Center for 8 days,water,0
+Fire hazard due to chemicals stored at Grand Mall,safety,0
+Public park fence damaged at Market Road,maintenance,0
+Unpaved street in City Center causing dust issues,roads,0
+Sewer blockage and overflow on Street 1,maintenance,0
+Emergency exit blocked in the complex at Industrial Area,safety,0
+Water shortage in Railway Colony for 1 days,water,0
+Overflowing bins at City Center market,garbage,0
+Suspicious crowd gathered near Community Hall,safety,0
+Streetlight dark zone making it unsafe near Main Junction,safety,0
+Signal failure and road blockage at Grand Mall,roads,0
+hello world,general,1
+Damaged road surface near City Center station,roads,0
+Garbage not collected for 5 days in Industrial Area,garbage,0
+Fire hazard due to chemicals stored at Central Station,safety,0
+Public inquiry regarding site development at Main Junction,general,0
+Garbage not collected for 9 days in City Center,garbage,0
+Overhanging electrical wires near Silver Towers,utility,0
+Streetlight dark zone making it unsafe near Public Hospital,safety,0
+Streetlight dark zone making it unsafe near Main Junction,safety,0
+Streetlight not working for the entire lane at Lakeview,utility,0
+"Dirty water supply in Lakeview, please check",water,0
+Waste collection truck missed our ward 3,garbage,0
+Overhanging electrical wires near Silver Towers,utility,0
+Public park fence damaged at Green Park,maintenance,0
+Garbage not collected for 9 days in City Center,garbage,0
+Clogged gutter causing street flooding,maintenance,0
+Pipeline leakage near Police Chowki causing water waste,water,0
+Overflowing bins at Railway Colony market,garbage,0
+New road cracking after 7 weeks of usage,roads,0
+Open drain near the school at Lakeview,maintenance,0
+Overflowing bins at Industrial Area market,garbage,0
+sample data for triage,general,1
+No water tanker arrived today at City Center,water,0
+Water shortage in Green Park for 5 days,water,0
+Garbage not collected for 2 days in Industrial Area,garbage,0
+Overflowing bins at Market Road market,garbage,0
+Illegal dumping behind the Silver Towers,garbage,0
+Contaminated water from the main line in Green Park,water,0
+Unpaved street in Sector 12 causing dust issues,roads,0
+Water shortage in Industrial Area for 3 days,water,0
+Fire hazard due to chemicals stored at High School,safety,0
+Utility line burst causing road flooding in Sector 12,utility,0
+Broken manhole cover near High School,maintenance,0
+Dead animal carcass on the road in Green Park,garbage,0
+Empty property being used for illegal activities in Green Park,safety,0
+free gift click here,general,1
+Overflowing bins at Market Road market,garbage,0
+Public park fence damaged at Green Park,maintenance,0
+Public inquiry regarding site development at Grand Mall,general,0
+Damaged road surface near Railway Colony station,roads,0
+Clogged gutter causing street flooding,maintenance,0
+Deep pothole at Public Hospital junction,roads,0
+Signal failure and road blockage at High School,roads,0
+Overhanging electrical wires near Galaxy Apartments,utility,0
+Maintenance needed for the bridge at Police Chowki,maintenance,0
+No water tanker arrived today at Railway Colony,water,0
+Unpaved street in Lakeview causing dust issues,roads,0
+Illegal dumping behind the Old Factory,garbage,0
+Transformer spark and fire risk near Police Chowki,utility,0
+Power outage in Sector 12 since 8 PM,utility,0
+Maintenance needed for the bridge at Police Chowki,maintenance,0
+General civic issue report for Green Park,general,0
+dummy report please ignore,general,1
+Overflowing bins at Green Park market,garbage,0
+Illegal dumping behind the Commercial Plaza,garbage,0
+Waste collection truck missed our ward 8,garbage,0
+Maintenance needed for the bridge at Central Station,maintenance,0
+Transformer spark and fire risk near Grand Mall,utility,0
+Requesting information about municipal taxes,general,0
+test test test 123,general,1
+Broken manhole cover near Central Station,maintenance,0
+Utility line burst causing road flooding in Industrial Area,utility,0
+Transformer spark and fire risk near Central Station,utility,0
+Water shortage in City Center for 2 days,water,0
+Water shortage in Lakeview for 10 days,water,0
+Public park fence damaged at Green Park,maintenance,0
+Maintenance needed for the bridge at Public Hospital,maintenance,0
+lorem ipsum dolor sit amet,general,1
+Low water pressure and dry taps for 1 hours,water,0
+Emergency exit blocked in the complex at Railway Colony,safety,0
+hello world,general,1
+Suspicious crowd gathered near Commercial Plaza,safety,0
+hello world,general,1
+lorem ipsum dolor sit amet,general,1
+free gift click here,general,1
+Pipeline leakage near Central Station causing water waste,water,0
+Utility line burst causing road flooding in Sector 12,utility,0
+Open drain near the school at Railway Colony,maintenance,0
+hello world,general,1
+Garbage not collected for 4 days in Lakeview,garbage,0
+Deep pothole at Main Junction junction,roads,0
+Unpaved street in Green Park causing dust issues,roads,0
+Unpaved street in Sector 12 causing dust issues,roads,0
+Sewer blockage and overflow on Street 65,maintenance,0
+Signal failure and road blockage at High School,roads,0
+Broken manhole cover near Police Chowki,maintenance,0
+Public inquiry regarding site development at Public Hospital,general,0
+spam buy now,general,1
+Public inquiry regarding site development at High School,general,0
+Public inquiry regarding site development at Main Junction,general,0
+Garbage not collected for 4 days in Lakeview,garbage,0
+Low water pressure and dry taps for 2 hours,water,0
+Low water pressure and dry taps for 2 hours,water,0
+sample data for triage,general,1
+"Dirty water supply in Market Road, please check",water,0
+Emergency exit blocked in the complex at Market Road,safety,0
+Empty property being used for illegal activities in City Center,safety,0
+Waste collection truck missed our ward 4,garbage,0
+Feedback on the new park in Industrial Area,general,0
+Unpaved street in Green Park causing dust issues,roads,0
+No security patrol visible in Market Road for weeks,safety,0
+Suspicious crowd gathered near Galaxy Apartments,safety,0
+Illegal dumping behind the Galaxy Apartments,garbage,0
+Power outage in Green Park since 8 PM,utility,0
+Feedback on the new park in Green Park,general,0
+New road cracking after 7 weeks of usage,roads,0
+hello world,general,1
+Utility line burst causing road flooding in Market Road,utility,0
+Streetlight dark zone making it unsafe near Police Chowki,safety,0
+hello world,general,1
+Feedback on the new park in City Center,general,0
+"Dirty water supply in Industrial Area, please check",water,0
+Damaged road surface near Railway Colony station,roads,0
+Stinking waste pileup near Public Hospital,garbage,0
+Overflowing bins at Industrial Area market,garbage,0
+Fire hazard due to chemicals stored at Central Station,safety,0
+Public park fence damaged at City Center,maintenance,0
+No security patrol visible in City Center for weeks,safety,0
+testing the system,general,1
+Power outage in City Center since 2 PM,utility,0
+Public inquiry regarding site development at Main Junction,general,0
+Overflowing bins at Sector 12 market,garbage,0
+Garbage not collected for 9 days in Railway Colony,garbage,0
+Waste collection truck missed our ward 2,garbage,0
+hello world,general,1
+Empty property being used for illegal activities in Sector 12,safety,0
+Stinking waste pileup near High School,garbage,0
+Requesting information about municipal taxes,general,0
+Requesting information about municipal taxes,general,0
+No security patrol visible in Market Road for weeks,safety,0
+Overflowing bins at Green Park market,garbage,0
+Power outage in Market Road since 1 PM,utility,0
+Streetlight dark zone making it unsafe near High School,safety,0
+Unpaved street in City Center causing dust issues,roads,0
+Open drain near the school at Railway Colony,maintenance,0
+Requesting information about municipal taxes,general,0
+Transformer spark and fire risk near Grand Mall,utility,0
+Broken dividers on the main road at Sector 12,roads,0
+Requesting information about municipal taxes,general,0
+Pipeline leakage near Main Junction causing water waste,water,0
+Requesting information about municipal taxes,general,0
+test test test 123,general,1
+General civic issue report for Sector 12,general,0
+spam buy now,general,1
+No water tanker arrived today at Sector 12,water,0
+Garbage not collected for 4 days in Lakeview,garbage,0
+lorem ipsum dolor sit amet,general,1
+Public park fence damaged at City Center,maintenance,0
+Fire hazard due to chemicals stored at Grand Mall,safety,0
+No water tanker arrived today at Market Road,water,0
+testing the system,general,1
+test test test 123,general,1
+Damaged road surface near Railway Colony station,roads,0
+Power outage in Green Park since 4 PM,utility,0
+No water tanker arrived today at Market Road,water,0
+Illegal dumping behind the Old Factory,garbage,0
+Streetlight not working for the entire lane at Green Park,utility,0
+Clogged gutter causing street flooding,maintenance,0
+Unpaved street in Sector 12 causing dust issues,roads,0
+Power outage in City Center since 3 PM,utility,0
+Waste collection truck missed our ward 3,garbage,0
+testing the system,general,1
+Gas pipeline repair needed at Market Road,utility,0
+New road cracking after 9 weeks of usage,roads,0
+ignore this,general,1
+Feedback on the new park in Market Road,general,0
+Broken manhole cover near High School,maintenance,0
+Waste collection truck missed our ward 5,garbage,0
+Overhanging electrical wires near Community Hall,utility,0
+Suspicious crowd gathered near Silver Towers,safety,0
+Requesting information about municipal taxes,general,0
+Streetlight dark zone making it unsafe near Main Junction,safety,0
+dummy report please ignore,general,1
+Streetlight dark zone making it unsafe near Main Junction,safety,0
+Deep pothole at Main Junction junction,roads,0
+Open drain near the school at Green Park,maintenance,0
+Suspicious crowd gathered near Commercial Plaza,safety,0
+Waste collection truck missed our ward 2,garbage,0
+ignore this,general,1
+Requesting information about municipal taxes,general,0
+No security patrol visible in Sector 12 for weeks,safety,0
+Signal failure and road blockage at High School,roads,0
+Public inquiry regarding site development at Central Station,general,0
+Streetlight dark zone making it unsafe near Central Station,safety,0
+General civic issue report for Industrial Area,general,0
+Public inquiry regarding site development at Police Chowki,general,0
+Unpaved street in Market Road causing dust issues,roads,0
+Fire hazard due to chemicals stored at Public Hospital,safety,0
+Clogged gutter causing street flooding,maintenance,0
+Public inquiry regarding site development at Grand Mall,general,0
+Pipeline leakage near Main Junction causing water waste,water,0
+Pipeline leakage near Public Hospital causing water waste,water,0
+Waste collection truck missed our ward 1,garbage,0
+lorem ipsum dolor sit amet,general,1
+Fire hazard due to chemicals stored at Police Chowki,safety,0
+Waste collection truck missed our ward 6,garbage,0
+ignore this,general,1
+Water shortage in Industrial Area for 2 days,water,0
+Illegal dumping behind the Commercial Plaza,garbage,0
+No security patrol visible in Green Park for weeks,safety,0
+Streetlight dark zone making it unsafe near Main Junction,safety,0
+Broken dividers on the main road at Railway Colony,roads,0
+Fire hazard due to chemicals stored at High School,safety,0
+Public park fence damaged at Railway Colony,maintenance,0
+Signal failure and road blockage at Police Chowki,roads,0
+Open drain near the school at Green Park,maintenance,0
+Fire hazard due to chemicals stored at Grand Mall,safety,0
+Deep pothole at Police Chowki junction,roads,0
+Emergency exit blocked in the complex at Market Road,safety,0
+No security patrol visible in Railway Colony for weeks,safety,0
+Suspicious crowd gathered near Old Factory,safety,0
+Broken dividers on the main road at Lakeview,roads,0
+Contaminated water from the main line in City Center,water,0
+Deep pothole at High School junction,roads,0
+sample data for triage,general,1
+Signal failure and road blockage at Police Chowki,roads,0
+Suspicious crowd gathered near Community Hall,safety,0
+Contaminated water from the main line in Green Park,water,0
+Contaminated water from the main line in City Center,water,0
+Emergency exit blocked in the complex at Sector 12,safety,0
+Feedback on the new park in Industrial Area,general,0
+free gift click here,general,1
+Broken dividers on the main road at Green Park,roads,0
+Emergency exit blocked in the complex at Railway Colony,safety,0
+No water tanker arrived today at City Center,water,0
+dummy report please ignore,general,1
+Waste collection truck missed our ward 1,garbage,0
+Emergency exit blocked in the complex at Lakeview,safety,0
+Open drain near the school at Market Road,maintenance,0
+Clogged gutter causing street flooding,maintenance,0
+Suspicious crowd gathered near Galaxy Apartments,safety,0
+dummy report please ignore,general,1
+Maintenance needed for the bridge at Central Station,maintenance,0
+Requesting information about municipal taxes,general,0
+"Dirty water supply in Green Park, please check",water,0
+Public inquiry regarding site development at Police Chowki,general,0
+Requesting information about municipal taxes,general,0
+hello world,general,1
+Stinking waste pileup near Grand Mall,garbage,0
+sample data for triage,general,1
+Suspicious crowd gathered near Commercial Plaza,safety,0
+Illegal dumping behind the Silver Towers,garbage,0
+Fire hazard due to chemicals stored at Public Hospital,safety,0
+Signal failure and road blockage at High School,roads,0
+Public inquiry regarding site development at Grand Mall,general,0
+Stinking waste pileup near Public Hospital,garbage,0
+Suspicious crowd gathered near Silver Towers,safety,0
+Feedback on the new park in Railway Colony,general,0
+lorem ipsum dolor sit amet,general,1
+Public inquiry regarding site development at Main Junction,general,0
+sample data for triage,general,1
+Damaged road surface near Green Park station,roads,0
+Broken manhole cover near High School,maintenance,0
+Low water pressure and dry taps for 5 hours,water,0
+Power outage in Green Park since 1 PM,utility,0
+Unpaved street in Green Park causing dust issues,roads,0
+Illegal dumping behind the Silver Towers,garbage,0
+"Dirty water supply in City Center, please check",water,0
+Waste collection truck missed our ward 6,garbage,0
+Garbage not collected for 8 days in Lakeview,garbage,0
+Gas pipeline repair needed at Green Park,utility,0
+Open drain near the school at Lakeview,maintenance,0
+Requesting information about municipal taxes,general,0
+Public inquiry regarding site development at Public Hospital,general,0
+Broken dividers on the main road at Railway Colony,roads,0
+Dead animal carcass on the road in Sector 12,garbage,0
+Dead animal carcass on the road in Industrial Area,garbage,0
+Streetlight not working for the entire lane at Sector 12,utility,0
+Feedback on the new park in City Center,general,0
+Deep pothole at Police Chowki junction,roads,0
+Transformer spark and fire risk near Central Station,utility,0
+Public inquiry regarding site development at Police Chowki,general,0
+Damaged road surface near Market Road station,roads,0
+Waste collection truck missed our ward 2,garbage,0
+Sewer blockage and overflow on Street 30,maintenance,0
+Emergency exit blocked in the complex at Lakeview,safety,0
+Contaminated water from the main line in City Center,water,0
+Contaminated water from the main line in Industrial Area,water,0
+Contaminated water from the main line in Sector 12,water,0
+Pipeline leakage near Grand Mall causing water waste,water,0
+New road cracking after 3 weeks of usage,roads,0
+asdf qwer zxcv,general,1
+asdf qwer zxcv,general,1
+Feedback on the new park in Green Park,general,0
+Clogged gutter causing street flooding,maintenance,0
+Power outage in Industrial Area since 7 PM,utility,0
+General civic issue report for Lakeview,general,0
+"Dirty water supply in Industrial Area, please check",water,0
+asdf qwer zxcv,general,1
+New road cracking after 6 weeks of usage,roads,0
+Emergency exit blocked in the complex at Railway Colony,safety,0
+Low water pressure and dry taps for 9 hours,water,0
+Public park fence damaged at Industrial Area,maintenance,0
+hello world,general,1
+lorem ipsum dolor sit amet,general,1
+Empty property being used for illegal activities in Sector 12,safety,0
+Transformer spark and fire risk near Police Chowki,utility,0
+Clogged gutter causing street flooding,maintenance,0
+Water shortage in City Center for 8 days,water,0
+Waste collection truck missed our ward 2,garbage,0
+Pipeline leakage near High School causing water waste,water,0
+Water shortage in Lakeview for 3 days,water,0
+"Dirty water supply in Industrial Area, please check",water,0
+Public inquiry regarding site development at Grand Mall,general,0
+Feedback on the new park in Market Road,general,0
+sample data for triage,general,1
+free gift click here,general,1
+dummy report please ignore,general,1
+Public inquiry regarding site development at Public Hospital,general,0
+No water tanker arrived today at Green Park,water,0
+Open drain near the school at Market Road,maintenance,0
+Contaminated water from the main line in Railway Colony,water,0
+No security patrol visible in Railway Colony for weeks,safety,0
+Unpaved street in Industrial Area causing dust issues,roads,0
+Illegal dumping behind the Old Factory,garbage,0
+testing the system,general,1
+Overhanging electrical wires near Galaxy Apartments,utility,0
+Feedback on the new park in Industrial Area,general,0
+Streetlight dark zone making it unsafe near High School,safety,0
+Open drain near the school at Market Road,maintenance,0
+dummy report please ignore,general,1
+Damaged road surface near Railway Colony station,roads,0
+spam buy now,general,1
+Low water pressure and dry taps for 5 hours,water,0
+Sewer blockage and overflow on Street 98,maintenance,0
+Damaged road surface near Lakeview station,roads,0
+Unpaved street in Railway Colony causing dust issues,roads,0
+Deep pothole at Main Junction junction,roads,0
+No water tanker arrived today at Market Road,water,0
+Contaminated water from the main line in Industrial Area,water,0
+Requesting information about municipal taxes,general,0
+Clogged gutter causing street flooding,maintenance,0
+testing the system,general,1
+Streetlight dark zone making it unsafe near High School,safety,0
+No security patrol visible in Market Road for weeks,safety,0
+Public inquiry regarding site development at Police Chowki,general,0
+hello world,general,1
+testing the system,general,1
+Unpaved street in Lakeview causing dust issues,roads,0
+Unpaved street in Railway Colony causing dust issues,roads,0
+Requesting information about municipal taxes,general,0
+ignore this,general,1
+test test test 123,general,1
+spam buy now,general,1
+Garbage not collected for 7 days in City Center,garbage,0
+Contaminated water from the main line in Lakeview,water,0
+testing the system,general,1
+Illegal dumping behind the Galaxy Apartments,garbage,0
+Streetlight dark zone making it unsafe near Public Hospital,safety,0
+Pipeline leakage near Grand Mall causing water waste,water,0
+sample data for triage,general,1
+Unpaved street in Railway Colony causing dust issues,roads,0
+No security patrol visible in Industrial Area for weeks,safety,0
+Suspicious crowd gathered near Old Factory,safety,0
+Empty property being used for illegal activities in Market Road,safety,0
+Unpaved street in Market Road causing dust issues,roads,0
+Feedback on the new park in Lakeview,general,0
+Requesting information about municipal taxes,general,0
+Streetlight not working for the entire lane at Sector 12,utility,0
+testing the system,general,1
+Deep pothole at High School junction,roads,0
+Broken dividers on the main road at Green Park,roads,0
+hello world,general,1
+Clogged gutter causing street flooding,maintenance,0
+Maintenance needed for the bridge at Police Chowki,maintenance,0
+Utility line burst causing road flooding in Lakeview,utility,0
+Low water pressure and dry taps for 3 hours,water,0
+Emergency exit blocked in the complex at Market Road,safety,0
+Public inquiry regarding site development at Public Hospital,general,0
+Requesting information about municipal taxes,general,0
+"Dirty water supply in Lakeview, please check",water,0
+Clogged gutter causing street flooding,maintenance,0
+Contaminated water from the main line in Lakeview,water,0
+Garbage not collected for 10 days in Industrial Area,garbage,0
+Gas pipeline repair needed at Lakeview,utility,0
+Power outage in Market Road since 1 PM,utility,0
+Dead animal carcass on the road in Industrial Area,garbage,0
+Suspicious crowd gathered near Old Factory,safety,0
+Public inquiry regarding site development at High School,general,0
+dummy report please ignore,general,1
+testing the system,general,1
+Illegal dumping behind the Commercial Plaza,garbage,0
+Requesting information about municipal taxes,general,0
+General civic issue report for Industrial Area,general,0
+test test test 123,general,1
+Empty property being used for illegal activities in Sector 12,safety,0
+Open drain near the school at Railway Colony,maintenance,0
+Low water pressure and dry taps for 7 hours,water,0
+Signal failure and road blockage at Police Chowki,roads,0
+asdf qwer zxcv,general,1
