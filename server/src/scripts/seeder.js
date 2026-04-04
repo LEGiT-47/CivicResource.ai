@@ -93,7 +93,9 @@ const seedData = async () => {
       { name: 'Worker 17 - Utility Grid Field Unit', email: 'worker17@civicflow.ai', password: 'worker17', role: 'responder', organization: 'Mumbai Electricity Board', unitId: 'UTL-005' },
       { name: 'Worker 18 - Utility Grid Supervisor', email: 'worker18@civicflow.ai', password: 'worker18', role: 'responder', organization: 'Mumbai Electricity Board', unitId: 'UTL-006' },
       { name: 'Worker 19 - Flood Response Unit', email: 'worker19@civicflow.ai', password: 'worker19', role: 'responder', organization: 'Mumbai Disaster Response', unitId: 'WAT-004' },
-      { name: 'Worker 20 - Drainage Repair Unit', email: 'worker20@civicflow.ai', password: 'worker20', role: 'responder', organization: 'Mumbai Public Works', unitId: 'UTL-007' }
+      { name: 'Worker 20 - Drainage Repair Unit', email: 'worker20@civicflow.ai', password: 'worker20', role: 'responder', organization: 'Mumbai Public Works', unitId: 'UTL-007' },
+      { name: 'Worker 21 - Goregaon Water Unit', email: 'worker21@civicflow.ai', password: 'worker21', role: 'responder', organization: 'Mumbai Water Supply', unitId: 'GOR-WAT-001' },
+      { name: 'Worker 22 - Goregaon Sanitation Unit', email: 'worker22@civicflow.ai', password: 'worker22', role: 'responder', organization: 'Mumbai Sanitation Department', unitId: 'GOR-GAR-001' }
     ]);
 
     const incidents = await Incident.create([
@@ -226,7 +228,9 @@ const seedData = async () => {
       { name: 'Drainage Repair DR-05', type: 'public_works', status: 'patrol', location: { lat: 19.04, lng: 72.84 }, batteryOrFuelLevel: 84 },
       { name: 'Drainage Repair DR-06', type: 'public_works', status: 'patrol', location: { lat: 19.17, lng: 72.86 }, batteryOrFuelLevel: 76 },
       { name: 'Road Service RS-41', type: 'public_works', status: 'patrol', location: { lat: 19.09, lng: 72.9 }, batteryOrFuelLevel: 81 },
-      { name: 'Road Service RS-42', type: 'public_works', status: 'patrol', location: { lat: 19.12, lng: 72.85 }, batteryOrFuelLevel: 78 }
+      { name: 'Road Service RS-42', type: 'public_works', status: 'patrol', location: { lat: 19.12, lng: 72.85 }, batteryOrFuelLevel: 78 },
+      { name: 'Water Tanker WT-GOR-01', type: 'public_works', status: 'patrol', location: { lat: 19.1663, lng: 72.8526 }, batteryOrFuelLevel: 91 },
+      { name: 'Garbage Truck GT-GOR-01', type: 'public_works', status: 'patrol', location: { lat: 19.1628, lng: 72.8452 }, batteryOrFuelLevel: 89 }
     ]);
 
     const personnel = await Personnel.create([
@@ -258,7 +262,9 @@ const seedData = async () => {
       { name: 'Worker 17 - Utility Grid Field Unit', type: 'utility', status: 'available', location: { lat: 19.02, lng: 72.9 }, contact: { phone: '+91-9000000017', unitId: 'UTL-005' } },
       { name: 'Worker 18 - Utility Grid Supervisor', type: 'utility', status: 'available', location: { lat: 19.17, lng: 72.83 }, contact: { phone: '+91-9000000018', unitId: 'UTL-006' } },
       { name: 'Worker 19 - Flood Response Unit', type: 'utility', status: 'available', location: { lat: 19.07, lng: 72.95 }, contact: { phone: '+91-9000000019', unitId: 'WAT-004' } },
-      { name: 'Worker 20 - Drainage Repair Unit', type: 'utility', status: 'available', location: { lat: 19.04, lng: 72.9 }, contact: { phone: '+91-9000000020', unitId: 'UTL-007' } }
+      { name: 'Worker 20 - Drainage Repair Unit', type: 'utility', status: 'available', location: { lat: 19.04, lng: 72.9 }, contact: { phone: '+91-9000000020', unitId: 'UTL-007' } },
+      { name: 'Worker 21 - Goregaon Water Unit', type: 'utility', status: 'available', location: { lat: 19.1663, lng: 72.8526 }, contact: { phone: '+91-9000000021', unitId: 'GOR-WAT-001' } },
+      { name: 'Worker 22 - Goregaon Sanitation Unit', type: 'sanitation', status: 'available', location: { lat: 19.1628, lng: 72.8452 }, contact: { phone: '+91-9000000022', unitId: 'GOR-GAR-001' } }
     ]);
 
     const extraIncidents = await Incident.create([
@@ -273,7 +279,9 @@ const seedData = async () => {
       { title: 'Streetlight blackout corridor in Jogeshwari East', type: 'utility', severity: 'medium', location: { lat: 19.132, lng: 72.857, address: 'Jogeshwari East, Mumbai' }, aiPredictionConfidence: 79 },
       { title: 'Transformer overload alerts in Ghatkopar West', type: 'utility', severity: 'high', location: { lat: 19.09, lng: 72.89, address: 'Ghatkopar West, Mumbai' }, aiPredictionConfidence: 87 },
       { title: 'Traffic diversions causing service delays near Dharavi', type: 'traffic', severity: 'medium', location: { lat: 19.045, lng: 72.86, address: 'Dharavi Main Road, Mumbai' }, aiPredictionConfidence: 76 },
-      { title: 'Roadside debris obstructing tanker routes', type: 'infrastructure', severity: 'high', location: { lat: 19.02, lng: 72.872, address: 'Lower Parel Connector, Mumbai' }, aiPredictionConfidence: 83 }
+      { title: 'Roadside debris obstructing tanker routes', type: 'infrastructure', severity: 'high', location: { lat: 19.02, lng: 72.872, address: 'Lower Parel Connector, Mumbai' }, aiPredictionConfidence: 83 },
+      { title: 'Water shortage in Goregaon East near Station Road', type: 'water', severity: 'high', location: { lat: 19.1663, lng: 72.8526, address: 'Goregaon East Station Road, Mumbai' }, aiPredictionConfidence: 91 },
+      { title: 'Garbage overflow in Goregaon West market lane', type: 'sanitation', severity: 'high', location: { lat: 19.1628, lng: 72.8452, address: 'Goregaon West Market Lane, Mumbai' }, aiPredictionConfidence: 90 }
     ]);
 
     // Assign at least one incident to every worker with mixed states
