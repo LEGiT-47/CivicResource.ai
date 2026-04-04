@@ -16,6 +16,7 @@ export const authUser = async (req, res, next) => {
         email: user.email,
         organization: user.organization,
         role: user.role,
+        unitId: user.unitId || null,
         token: generateToken(user._id),
       });
     } else {
@@ -81,6 +82,7 @@ export const getUserProfile = async (req, res, next) => {
         email: user.email,
         organization: user.organization,
         role: user.role,
+        unitId: user.unitId || null,
       });
     } else {
       res.status(404);

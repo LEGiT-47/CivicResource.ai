@@ -3,10 +3,11 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   AlertTriangle, Clock, ChevronDown, Filter, Search, 
   ShieldAlert, BarChart3, ArrowUpRight, Zap, CheckCircle, 
-  Activity, Info, Printer
+  Activity, Info, Printer, MapPin
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
+import { toast } from "sonner";
 
 const severityColors = {
   critical: "text-primary border-primary/20 bg-primary/5",
@@ -19,6 +20,8 @@ export default function Escalation() {
   const [filter, setFilter] = useState<"all" | "critical" | "high">("all");
   const [incidents, setIncidents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [briefingOpen, setBriefingOpen] = useState(false);
 
   useEffect(() => {
     const fetchIncidents = async () => {
@@ -34,9 +37,23 @@ export default function Escalation() {
     fetchIncidents();
   }, []);
 
-  const filtered = filter === "all" 
-    ? incidents 
-    : incidents.filter((i) => i.severity === filter);
+  const filtered = incidents.filter((incident) => {
+    if (filter !== "all" && incident.severity !== filter) {
+      return false;
+    }
+
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) {
+      return true;
+    }
+
+    return [
+      String(incident._id || ""),
+      String(incident.title || ""),
+      String(incident.location?.address || ""),
+      String(incident.status || ""),
+    ].some((field) => field.toLowerCase().includes(query));
+  });
 
   if (loading) return (
     <div className="h-full flex flex-col items-center justify-center p-8 bg-white">
@@ -66,6 +83,8 @@ export default function Escalation() {
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-primary transition-colors" />
             <input 
               placeholder="Filter protocol ID..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-13 pr-6 py-4 rounded-2xl bg-slate-50 border-none text-[10px] font-black uppercase tracking-[0.2em] outline-none w-64 focus:bg-white transition-all" 
             />
           </div>
@@ -202,14 +221,51 @@ export default function Escalation() {
             </div>
             
             <div className="flex items-center gap-6">
-                <button className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors">
+                <button
+                  onClick={() => {
+                    setBriefingOpen((prev) => !prev);
+                    toast.success(briefingOpen ? "Protocol briefing collapsed" : "Protocol briefing expanded");
+                  }}
+                  className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 hover:text-slate-900 transition-colors"
+                >
                    Protocol briefing <ChevronDown className="w-4 h-4" />
                 </button>
-                <button className="flex items-center gap-3 px-8 py-5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.3em] hover:bg-black transition-all shadow-plinth active:scale-95">
+                <button
+                  onClick={() => {
+                    const payload = {
+                      generatedAt: new Date().toISOString(),
+                      filter,
+                      searchTerm,
+                      totalRecords: filtered.length,
+                      incidents: filtered,
+                    };
+                    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `governance-broadcast-${Date.now()}.json`;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    toast.success(`Broadcast report generated (${filtered.length} records)`);
+                  }}
+                  className="flex items-center gap-3 px-8 py-5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.3em] hover:bg-black transition-all shadow-plinth active:scale-95"
+                >
                     <Printer className="w-4 h-4" /> Broadcast Status Report <ArrowUpRight className="w-4 h-4" />
                 </button>
             </div>
         </div>
+
+        {briefingOpen && (
+          <div className="px-10 pb-8 bg-slate-50/30 border-t border-border/30">
+            <div className="rounded-2xl border border-border/40 bg-white p-5">
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Protocol Briefing</p>
+              <p className="text-[11px] font-bold uppercase tracking-wide text-slate-600 leading-relaxed">
+                Critical protocols are prioritized for immediate field response. Use filter and search to isolate cases,
+                then broadcast the status report for compliance and audit review.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -26,6 +26,13 @@ const userSchema = mongoose.Schema(
       enum: ['operator', 'admin', 'responder'],
       default: 'operator',
     },
+    unitId: {
+      type: String,
+      uppercase: true,
+      trim: true,
+      sparse: true,
+      unique: true,
+    },
   },
   {
     timestamps: true,

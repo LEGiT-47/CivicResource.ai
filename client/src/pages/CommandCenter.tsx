@@ -53,9 +53,23 @@ export default function CommandCenter() {
     return () => clearInterval(interval);
   }, []);
 
-  const runOptimization = () => {
+  const runOptimization = async () => {
     setIsOptimizing(true);
-    setTimeout(() => setIsOptimizing(false), 2400);
+    try {
+      const [{ data: latestIncidents }, { data: latestResources }] = await Promise.all([
+        api.get("/incidents"),
+        api.get("/resources"),
+      ]);
+      setIncidents(latestIncidents);
+      setResources(latestResources);
+      await runGlobalAnalysis();
+      toast.success("Optimization cycle completed");
+    } catch (err) {
+      console.error("Optimization cycle failed", err);
+      toast.error("Unable to execute optimization");
+    } finally {
+      setIsOptimizing(false);
+    }
   };
 
   const runGlobalAnalysis = async () => {

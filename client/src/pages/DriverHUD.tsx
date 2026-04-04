@@ -1,13 +1,147 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Navigation, MapPin, AlertCircle, Clock, 
   CheckCircle, Shield, Truck, Zap, Phone,
-  ArrowRight, Activity, Radio, Signal, Info, Search
+   ArrowRight, Activity, Radio, Signal, Info, Search, AlertTriangle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
+import type { LatLngExpression } from "leaflet";
+
+type RiskMarker = {
+   id: string;
+   lat: number;
+   lng: number;
+   label: string;
+   risk: "high" | "medium" | "low";
+};
+
+function TacticalMapFocus({ position }: { position: LatLngExpression }) {
+   const map = useMap();
+   useEffect(() => {
+      map.flyTo(position, Math.max(map.getZoom(), 13), { duration: 0.8 });
+   }, [map, position]);
+   return null;
+}
+
+function TacticalWorkerMap({
+   activeIncident,
+   incidents,
+}: {
+   activeIncident: any;
+   incidents: any[];
+}) {
+   const incidentLat = Number(activeIncident?.location?.lat);
+   const incidentLng = Number(activeIncident?.location?.lng);
+
+   if (!Number.isFinite(incidentLat) || !Number.isFinite(incidentLng)) {
+      return (
+         <div className="h-[340px] rounded-3xl border border-border/50 bg-slate-50 flex items-center justify-center text-slate-500 text-xs font-black uppercase tracking-wider">
+            Incident coordinates unavailable
+         </div>
+      );
+   }
+
+   const unitLat = Number(activeIncident?.assignedPersonnel?.location?.lat ?? incidentLat - 0.012);
+   const unitLng = Number(activeIncident?.assignedPersonnel?.location?.lng ?? incidentLng - 0.01);
+   const incidentPoint: LatLngExpression = [incidentLat, incidentLng];
+   const unitPoint: LatLngExpression = [unitLat, unitLng];
+
+   const routeMidPoint: LatLngExpression = [
+      (unitLat + incidentLat) / 2 + 0.002,
+      (unitLng + incidentLng) / 2 - 0.002,
+   ];
+
+   const nearbyFromOtherAssignments: RiskMarker[] = (incidents || [])
+      .filter((inc: any) => inc?._id !== activeIncident?._id && inc?.location?.lat != null && inc?.location?.lng != null)
+      .slice(0, 3)
+      .map((inc: any, idx: number) => ({
+         id: `nearby-${inc._id}`,
+         lat: Number(inc.location.lat),
+         lng: Number(inc.location.lng),
+         label: inc.title || `Nearby risk ${idx + 1}`,
+         risk: inc.severity === "critical" || inc.severity === "high" ? "high" : inc.severity === "medium" ? "medium" : "low",
+      }));
+
+   const generatedNearby: RiskMarker[] = [
+      { id: "gen-1", lat: incidentLat + 0.005, lng: incidentLng + 0.004, label: "Crowd density spike", risk: "high" },
+      { id: "gen-2", lat: incidentLat - 0.004, lng: incidentLng + 0.006, label: "Access lane blocked", risk: "medium" },
+      { id: "gen-3", lat: incidentLat + 0.003, lng: incidentLng - 0.005, label: "Utility hazard zone", risk: "low" },
+   ];
+
+   const riskMarkers = nearbyFromOtherAssignments.length ? nearbyFromOtherAssignments : generatedNearby;
+
+   const riskColor = (risk: RiskMarker["risk"]) => {
+      if (risk === "high") return "#ef4444";
+      if (risk === "medium") return "#f59e0b";
+      return "#10b981";
+   };
+
+   return (
+      <div className="h-[340px] rounded-3xl overflow-hidden border border-border/50 relative">
+         <MapContainer center={incidentPoint} zoom={13} className="h-full w-full" zoomControl={false}>
+            <TacticalMapFocus position={incidentPoint} />
+            <TileLayer
+               attribution='&copy; OpenStreetMap contributors'
+               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+
+            <Polyline
+               positions={[unitPoint, routeMidPoint, incidentPoint]}
+               pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.9, dashArray: "10 6" }}
+            />
+
+            <CircleMarker
+               center={unitPoint}
+               radius={8}
+               pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#2563eb", fillOpacity: 1 }}
+            >
+               <Tooltip direction="top">Responder Unit</Tooltip>
+               <Popup>
+                  <div className="text-[12px] font-bold">Responder Unit</div>
+                  <div className="text-[11px] text-slate-500">{unitLat.toFixed(5)}, {unitLng.toFixed(5)}</div>
+               </Popup>
+            </CircleMarker>
+
+            <CircleMarker
+               center={incidentPoint}
+               radius={10}
+               pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#ff4f00", fillOpacity: 1 }}
+            >
+               <Tooltip direction="top">Incident Target</Tooltip>
+               <Popup>
+                  <div className="text-[12px] font-bold">{activeIncident?.title}</div>
+                  <div className="text-[11px] text-slate-500">{incidentLat.toFixed(5)}, {incidentLng.toFixed(5)}</div>
+               </Popup>
+            </CircleMarker>
+
+            {riskMarkers.map((risk) => (
+               <CircleMarker
+                  key={risk.id}
+                  center={[risk.lat, risk.lng]}
+                  radius={7}
+                  pathOptions={{ color: "#ffffff", weight: 2, fillColor: riskColor(risk.risk), fillOpacity: 0.9 }}
+               >
+                  <Tooltip direction="top">{risk.label}</Tooltip>
+                  <Popup>
+                     <div className="text-[12px] font-bold">{risk.label}</div>
+                     <div className="text-[11px] uppercase text-slate-500">Risk: {risk.risk}</div>
+                     <div className="text-[11px] text-slate-500">{risk.lat.toFixed(5)}, {risk.lng.toFixed(5)}</div>
+                  </Popup>
+               </CircleMarker>
+            ))}
+         </MapContainer>
+
+         <div className="absolute top-3 left-3 z-[500] rounded-xl bg-white/95 border border-border/60 px-3 py-2">
+            <div className="text-[9px] font-black uppercase tracking-widest text-slate-700">Tactical Layer</div>
+            <div className="text-[9px] font-bold text-slate-500">Blue: Unit route, Red: Incident, Risk dots: nearby hazards</div>
+         </div>
+      </div>
+   );
+}
 
 export default function DriverHUD() {
   const [activeIncident, setActiveIncident] = useState<any>(null);
@@ -16,20 +150,45 @@ export default function DriverHUD() {
   const [loading, setLoading] = useState(true);
    const [isRouting, setIsRouting] = useState(false);
    const [isCompleting, setIsCompleting] = useState(false);
+   const activeIncidentIdRef = useRef<string | null>(null);
+
+   const selectIncident = (incident: any | null) => {
+      setActiveIncident(incident);
+      activeIncidentIdRef.current = incident?._id || null;
+   };
+
+   const refreshAssignments = async () => {
+      const { data } = await api.get('/dispatch/my-assignments');
+      setIncidents(data || []);
+
+      const sorted = [...(data || [])].sort((a: any, b: any) => {
+         const score = (incident: any) => {
+            if (incident.status === 'resolved' || incident.dispatchStatus === 'completed') return 0;
+            if (incident.status === 'investigating' || incident.dispatchStatus === 'on-site') return 3;
+            if (incident.dispatchStatus === 'dispatched' || incident.dispatchStatus === 'resolving') return 2;
+            return 1;
+         };
+         return score(b) - score(a);
+      });
+
+      const selectedId = activeIncidentIdRef.current;
+      if (!selectedId && sorted.length > 0) {
+         selectIncident(sorted.find((i: any) => i.status !== 'resolved') || sorted[0]);
+      } else if (selectedId) {
+         const refreshedActive = sorted.find((i: any) => i._id === selectedId);
+         selectIncident(refreshedActive || (sorted[0] || null));
+      } else {
+         selectIncident(null);
+      }
+   };
 
   useEffect(() => {
     const fetchIncidents = async () => {
       try {
-        const { data } = await api.get('/incidents');
-        setIncidents(data);
-        if (!activeIncident && data.length > 0) {
-          setActiveIncident(data.find((i: any) => i.severity === 'critical') || data[0]);
-            } else if (activeIncident) {
-               const refreshedActive = data.find((i: any) => i._id === activeIncident._id);
-               if (refreshedActive) setActiveIncident(refreshedActive);
-        }
+        await refreshAssignments();
       } catch (err) {
         console.error("DriverHUD fetch failed", err);
+        toast.error("Unable to load your assignments");
       } finally {
         setLoading(false);
       }
@@ -45,10 +204,7 @@ export default function DriverHUD() {
       try {
          await api.put(`/incidents/${activeIncident._id}/status`, { status: 'investigating' });
          toast.success("Route initialized and status updated to investigating");
-         const { data } = await api.get('/incidents');
-         setIncidents(data);
-         const refreshed = data.find((i: any) => i._id === activeIncident._id);
-         if (refreshed) setActiveIncident(refreshed);
+         await refreshAssignments();
       } catch (err) {
          toast.error("Failed to initialize route");
          console.error(err);
@@ -63,10 +219,7 @@ export default function DriverHUD() {
       try {
          await api.put(`/incidents/${activeIncident._id}/status`, { status: 'resolved' });
          toast.success("Incident marked resolved");
-         const { data } = await api.get('/incidents');
-         setIncidents(data);
-         const next = data.find((i: any) => i.severity === 'critical') || data[0] || null;
-         setActiveIncident(next);
+         await refreshAssignments();
       } catch (err) {
          toast.error("Failed to mark incident resolved");
          console.error(err);
@@ -95,13 +248,11 @@ export default function DriverHUD() {
       );
    });
 
-   const topologyBars = Array.from({ length: 42 }).map((_, i) => {
-      const base = 18 + (i % 7) * 10;
-      const sevBonus = activeIncident?.severity === 'critical' ? 12 : activeIncident?.severity === 'high' ? 8 : 4;
-      return Math.min(96, base + sevBonus);
-   });
-
    const etaMinutes = activeIncident?.severity === 'critical' ? 8 : activeIncident?.severity === 'high' ? 12 : 18;
+   const isResolved = Boolean(activeIncident && (activeIncident.status === 'resolved' || activeIncident.dispatchStatus === 'completed'));
+   const isEngaged = Boolean(activeIncident && (activeIncident.status === 'investigating' || activeIncident.dispatchStatus === 'on-site' || activeIncident.dispatchStatus === 'resolving'));
+   const canInitialize = Boolean(activeIncident) && !isResolved && !isEngaged;
+   const canResolve = Boolean(activeIncident) && !isResolved && isEngaged;
 
   if (loading) return (
     <div className="h-full flex items-center justify-center bg-white">
@@ -165,10 +316,10 @@ export default function DriverHUD() {
                <div className="mt-auto flex gap-4 relative z-10 pt-12">
                   <button
                     onClick={handleInitializeRoute}
-                    disabled={isRouting}
-                    className="flex-1 py-6 rounded-2xl bg-white text-slate-900 text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+                              disabled={isRouting || !canInitialize}
+                              className="flex-1 py-6 rounded-2xl bg-white text-slate-900 text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                     <Navigation className="w-4 h-4" /> {isRouting ? 'Routing...' : 'Initialize Route'}
+                               <Navigation className="w-4 h-4" /> {isRouting ? 'Routing...' : 'Initialize Route'}
                   </button>
                   <button
                     onClick={handleControlRoomCall}
@@ -180,20 +331,18 @@ export default function DriverHUD() {
             </div>
 
             <div className="flex flex-col gap-8">
-               <div className="tactile-slab bg-white flex-1 relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_10px_10px,#00000008_1px,transparent_0)] bg-[length:20px_20px]" />
-                  <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
-                     <div className="w-16 h-16 rounded-full bg-slate-100 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                        <Activity className="w-8 h-8 text-primary" />
-                     </div>
-                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 block">District Topology</span>
-                     <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Active Proximity</h4>
-                     <div className="mt-8 flex items-end gap-1.5 h-20 w-full">
-                        {topologyBars.map((height, i) => (
-                           <div key={i} className="flex-1 bg-primary/20 rounded-t-sm" style={{ height: `${height}%` }} />
-                        ))}
-                     </div>
+               <div className="tactile-slab bg-white flex-1 relative overflow-hidden group p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Strategic Map</span>
+                      <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight mt-1">Live Tactical View</h4>
+                    </div>
+                    <div className="inline-flex items-center gap-2 text-[9px] font-black uppercase tracking-wider text-amber-600 bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Nearby Risks
+                    </div>
                   </div>
+                  <TacticalWorkerMap activeIncident={activeIncident} incidents={incidents} />
+                  <p className="mt-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Coordinates, route path, and nearby risk markers update per selected incident.</p>
                </div>
                
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -216,13 +365,19 @@ export default function DriverHUD() {
                </div>
 
                <div className="mt-8">
-                 <button
-                    onClick={handleMarkResolved}
-                    disabled={isCompleting}
-                    className="w-full py-4 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-50"
-                 >
-                    {isCompleting ? 'Completing...' : 'Mark Incident Resolved'}
-                 </button>
+                 {isResolved ? (
+                    <div className="w-full py-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[10px] font-black uppercase tracking-[0.3em] text-center">
+                      Incident Closed
+                    </div>
+                 ) : (
+                    <button
+                       onClick={handleMarkResolved}
+                       disabled={isCompleting || !canResolve}
+                       className="w-full py-4 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                       {isCompleting ? 'Completing...' : 'Mark Incident Resolved'}
+                    </button>
+                 )}
                </div>
             </div>
           </div>
@@ -259,7 +414,7 @@ export default function DriverHUD() {
               <motion.button
                 key={incident._id}
                 whileHover={{ scale: 1.02, x: 5 }}
-                onClick={() => setActiveIncident(incident)}
+                onClick={() => selectIncident(incident)}
                 className={cn(
                   "w-full p-8 rounded-3xl text-left transition-all border-2",
                   activeIncident?._id === incident._id 

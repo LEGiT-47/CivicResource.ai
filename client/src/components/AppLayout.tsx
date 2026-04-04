@@ -15,6 +15,8 @@ import {
   Send,
   Archive,
   Truck,
+  ShieldAlert,
+  RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -31,6 +33,7 @@ const adminNavItems = [
   { to: "/app/dispatch", label: "Live Dispatch", icon: Send },
   { to: "/app/archive", label: "Incident Archive", icon: Archive },
   { to: "/app/intelligence", label: "Intelligence Matrix", icon: Activity },
+  { to: "/app/escalation", label: "Governance Matrix", icon: ShieldAlert },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -52,6 +55,10 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     localStorage.removeItem("CivicFlow_token");
     localStorage.removeItem("CivicFlow_user");
     navigate("/");
+  };
+
+  const handleRefresh = () => {
+    window.location.reload();
   };
 
   return (
@@ -139,6 +146,22 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
            </div>
 
            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRefresh}
+                  className="p-3 rounded-2xl bg-white hover:bg-slate-100 transition-colors border border-border/40"
+                  title="Reload"
+                >
+                  <RefreshCw className="w-5 h-5 text-slate-500" />
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="p-3 rounded-2xl bg-white hover:bg-destructive/10 transition-colors border border-border/40"
+                  title="Logout"
+                >
+                  <LogOut className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
               <div className="flex -space-x-3">
                  {[1,2,3].map(i => (
                    <div key={i} className="w-9 h-9 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-black">OP</div>
@@ -199,6 +222,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                       {item.label}
                     </NavLink>
                   ))}
+                  <div className="pt-6 space-y-3">
+                    <button
+                      onClick={handleRefresh}
+                      className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl bg-slate-100 text-slate-700 text-sm font-black uppercase tracking-widest"
+                    >
+                      <RefreshCw className="w-5 h-5" /> Reload
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl bg-destructive/10 text-destructive text-sm font-black uppercase tracking-widest"
+                    >
+                      <LogOut className="w-5 h-5" /> Logout
+                    </button>
+                  </div>
                </nav>
             </motion.div>
           )}

@@ -36,6 +36,14 @@ export default function DispatchSystem() {
         }
     };
 
+    const personnelToIncidentTypeMap: Record<string, string[]> = {
+        police: ["crime", "safety", "traffic"],
+        fire: ["fire"],
+        medical: ["medical"],
+        utility: ["utility", "infrastructure", "water"],
+        sanitation: ["sanitation"],
+    };
+
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 10000);
@@ -54,8 +62,8 @@ export default function DispatchSystem() {
             setIncidents((prev) => prev.filter((i) => i._id !== selectedIncident._id));
       setSelectedIncident(null);
             fetchData();
-    } catch (err) {
-      toast.error("Dispatch Failed");
+        } catch (err: any) {
+            toast.error(err?.response?.data?.message || "Dispatch Failed");
       console.error(err);
     } finally {
       setIsDispatching(false);
@@ -108,6 +116,12 @@ export default function DispatchSystem() {
         return p.type === "medical";
     });
 
+    const typeMatchedPersonnel = filteredPersonnel.filter((p) => {
+        if (!selectedIncident) return true;
+        const allowedTypes = personnelToIncidentTypeMap[p.type] || [];
+        return allowedTypes.includes(selectedIncident.type);
+    });
+
     const formatCoord = (n?: number) => (typeof n === 'number' ? n.toFixed(4) : 'NA');
 
     const personnelPanel = (
@@ -140,7 +154,7 @@ export default function DispatchSystem() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-                {filteredPersonnel.map((p) => (
+                {typeMatchedPersonnel.map((p) => (
                     <div
                         key={p._id}
                         className="group bg-slate-800/40 border border-slate-800 p-5 rounded-2xl hover:bg-slate-800 hover:border-slate-700 transition-all relative overflow-hidden"
@@ -171,6 +185,11 @@ export default function DispatchSystem() {
                         </div>
                     </div>
                 ))}
+                {selectedIncident && typeMatchedPersonnel.length === 0 && (
+                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-200 text-xs font-bold uppercase tracking-wider">
+                        No available personnel match this incident type right now.
+                    </div>
+                )}
             </div>
 
             <div className="p-8 border-t border-slate-800 bg-slate-900/50">

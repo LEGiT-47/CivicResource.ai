@@ -97,6 +97,12 @@ export default function CitizenReport() {
   };
 
   const handleSubmit = async () => {
+    const cleanedPhone = formData.reporterPhone.replace(/\D/g, "");
+    if (cleanedPhone.length < 10) {
+      toast.error("Please enter a valid mobile number");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const hasManualCoords = typeof formData.location.lat === "number" && typeof formData.location.lng === "number";
@@ -111,8 +117,8 @@ export default function CitizenReport() {
         type: formData.type,
         sourceLanguage: formData.sourceLanguage,
         severity: "medium",
-        reporterPhone: formData.reporterPhone,
-        isAnonymous: formData.isAnonymous,
+        reporterPhone: cleanedPhone,
+        isAnonymous: true,
         location: {
           address: formData.location.address,
           lat: coords.lat,
@@ -324,27 +330,19 @@ export default function CitizenReport() {
                 </div>
 
                 <div className="space-y-3 rounded-2xl border border-border/40 bg-white p-6">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Anonymous by default</p>
-                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 leading-relaxed">
-                        Add a mobile number if you want tracker access and duplicate protection.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setFormData((prev) => ({ ...prev, isAnonymous: !prev.isAnonymous }))}
-                      className={cn(
-                        "px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all",
-                        formData.isAnonymous ? "bg-primary text-white border-primary" : "bg-slate-50 text-slate-500 border-border/40"
-                      )}
-                    >
-                      {formData.isAnonymous ? "Anonymous" : "Share Number"}
-                    </button>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">Anonymous public display</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-2 leading-relaxed">
+                      Mobile number is required to reduce fake reports. Your complaint is still displayed as anonymous.
+                    </p>
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-[0.2em] mt-2 leading-relaxed">
+                      OTP verification will be added soon.
+                    </p>
                   </div>
                   <input
                     type="tel"
-                    placeholder="Mobile number (optional)"
+                    required
+                    placeholder="Mobile number (required)"
                     className="concierge-input w-full"
                     value={formData.reporterPhone}
                     onChange={(e) => setFormData((prev) => ({ ...prev, reporterPhone: e.target.value }))}
@@ -359,7 +357,7 @@ export default function CitizenReport() {
                     <ArrowLeft className="w-4 h-4" /> Revert
                   </button>
                   <button
-                    disabled={!formData.title || !formData.details}
+                    disabled={!formData.title || !formData.details || !formData.reporterPhone.trim()}
                     onClick={() => setStep(3)}
                     className="flex-[2] py-5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl hover:bg-black transition-all flex items-center justify-center gap-3 disabled:opacity-30 disabled:cursor-not-allowed group"
                   >

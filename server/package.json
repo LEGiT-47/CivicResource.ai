@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node src/scripts/seeder.js"
+    "seed": "node src/scripts/seeder.js",
+    "cleanup:seed:dry": "node src/scripts/cleanupSeedData.js --dry-run",
+    "cleanup:seed": "node src/scripts/cleanupSeedData.js"
   },
   "keywords": [],
   "author": "",

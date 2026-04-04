@@ -195,6 +195,13 @@ export const createIncident = async (req, res, next) => {
       isAnonymous = true,
     } = req.body;
 
+    const isPublicSubmission = req.originalUrl.includes('/api/public/incidents');
+    const normalizedPhone = reporterPhone ? String(reporterPhone).trim() : '';
+    if (isPublicSubmission && !normalizedPhone) {
+      res.status(400);
+      throw new Error('Mobile number is required for public complaint submission');
+    }
+
     const normalizedLanguage = normalizeLanguage(sourceLanguage);
     const normalizedType = normalizeType(type);
     const detailsText = details || description || '';
@@ -219,8 +226,8 @@ export const createIncident = async (req, res, next) => {
       location: locationWithCoords,
       details: detailsEnglish,
       aiPredictionConfidence: aiPredictionConfidence || 0,
-      reporterPhone: reporterPhone ? String(reporterPhone).trim() : '',
-      isAnonymous: Boolean(isAnonymous),
+      reporterPhone: normalizedPhone,
+      isAnonymous: isPublicSubmission ? true : Boolean(isAnonymous),
       sourceLanguage: normalizedLanguage,
       titleOriginal: title || titleEnglish,
       detailsOriginal: detailsText,

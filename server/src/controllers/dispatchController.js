@@ -69,6 +69,25 @@ export const assignPersonnel = async (req, res) => {
       return res.status(400).json({ message: 'Personnel is already busy or off-duty' });
     }
 
+    // Type-based validation: check if incident type matches personnel type
+    const typeMapping = {
+      'fire': ['fire'],
+      'medical': ['medical'],
+      'police': ['crime', 'safety', 'traffic', 'crime'],
+      'utility': ['utility', 'infrastructure', 'water'],
+      'sanitation': ['sanitation'],
+      'water': ['water'],
+    };
+
+    const allowedIncidentTypes = typeMapping[personnel.type] || [];
+    if (!allowedIncidentTypes.includes(incident.type)) {
+      return res.status(400).json({
+        message: `Cannot assign ${personnel.type} personnel to ${incident.type} incident`,
+        allowedTypes: allowedIncidentTypes,
+        incidentType: incident.type,
+      });
+    }
+
     // Assign
     incident.assignedPersonnel = personnelId;
     incident.dispatchStatus = 'dispatched';
@@ -97,6 +116,78 @@ export const getAvailablePersonnel = async (req, res) => {
   try {
     const personnel = await Personnel.find({ status: 'available' });
     res.json(personnel);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get worker assignments by unit id
+// @route   GET /api/dispatch/assignments/:unitId
+// @access  Private
+export const getWorkerAssignmentsByUnitId = async (req, res) => {
+  const unitId = String(req.params.unitId || '').trim().toUpperCase();
+
+  if (!unitId) {
+    return res.status(400).json({ message: 'unitId is required' });
+  }
+
+  try {
+    const personnel = await Personnel.findOne({ 'contact.unitId': unitId })
+      .populate('currentIncident', 'title severity status dispatchStatus trackingId location createdAt updatedAt');
+
+    if (!personnel) {
+      return res.status(404).json({ message: 'Personnel unit not found' });
+    }
+
+    const assignedIncidents = await Incident.find({
+      assignedPersonnel: personnel._id,
+      status: { $ne: 'resolved' },
+    })
+      .sort({ updatedAt: -1 })
+      .select('title severity status dispatchStatus trackingId location createdAt updatedAt');
+
+    res.json({
+      personnel: {
+        _id: personnel._id,
+        name: personnel.name,
+        type: personnel.type,
+        status: personnel.status,
+        unitId: personnel.contact?.unitId,
+      },
+      activeIncident: personnel.currentIncident || null,
+      assignedIncidents,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Get incidents assigned to logged-in worker by their user's associated personnel
+// @route   GET /api/dispatch/my-assignments
+// @access  Private (Worker/Responder)
+export const getMyAssignments = async (req, res) => {
+  try {
+    let personnel = null;
+    if (req.user?.unitId) {
+      personnel = await Personnel.findOne({ 'contact.unitId': req.user.unitId.toUpperCase() });
+    }
+
+    if (!personnel && req.user?.name) {
+      personnel = await Personnel.findOne({ name: req.user.name });
+    }
+
+    if (!personnel) {
+      return res.status(404).json({ message: 'Personnel profile not found for this worker account' });
+    }
+
+    const incidents = await Incident.find({
+      assignedPersonnel: personnel._id,
+    })
+      .populate('assignedPersonnel', 'name type contact status location')
+      .sort({ updatedAt: -1 })
+      .select('title severity status dispatchStatus type trackingId location details assignedPersonnel createdAt updatedAt');
+
+    res.json(incidents);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

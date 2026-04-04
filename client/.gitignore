@@ -25,3 +25,8 @@ dist-ssr
 
 # Vite artifacts
 .vite/
+
+# Environment variables
+.env
+.env.*
+!.env.example
