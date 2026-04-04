@@ -9,6 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { toast } from "sonner";
 
 const mockPerformanceData = [
     { time: "00:00", active: 45, resolved: 30 },
@@ -22,21 +23,107 @@ const mockPerformanceData = [
 
 export default function ReportsArchive() {
   const [reports, setReports] = useState<any[]>([]);
+    const [resources, setResources] = useState<any[]>([]);
+    const [personnel, setPersonnel] = useState<any[]>([]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
+    const [actionLoading, setActionLoading] = useState(false);
+    const [newResourceType, setNewResourceType] = useState<"police" | "fire" | "medical" | "public_works" | "drone">("public_works");
+
+    const syncArchiveData = async () => {
+        try {
+            const [reportsRes, resourcesRes, personnelRes] = await Promise.all([
+                api.get('/incidents?status=all'),
+                api.get('/resources'),
+                api.get('/dispatch/personnel')
+            ]);
+            setReports(reportsRes.data);
+            setResources(resourcesRes.data || []);
+            setPersonnel(personnelRes.data || []);
+        } catch (err) {
+            console.error("Reports fetch failed", err);
+            toast.error("Unable to sync archive records");
+        }
+    };
 
   useEffect(() => {
-    const fetchReports = async () => {
-      try {
-        const { data } = await api.get('/incidents');
-        setReports(data);
-      } catch (err) {
-        console.error("Reports fetch failed", err);
-      }
-    };
-    fetchReports();
+        syncArchiveData();
   }, []);
+
+    const updateStatus = async (status: 'active' | 'investigating' | 'resolved') => {
+        if (!selectedReport) return;
+        setActionLoading(true);
+        try {
+            const { data } = await api.put(`/incidents/${selectedReport._id}/status`, { status });
+            setSelectedReport(data);
+            toast.success(`Incident marked as ${status}`);
+            await syncArchiveData();
+        } catch (err) {
+            console.error(err);
+            toast.error("Unable to update incident status");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const assignPersonnel = async (personnelId: string) => {
+        if (!selectedReport) return;
+        setActionLoading(true);
+        try {
+            await api.post('/dispatch/assign', {
+                incidentId: selectedReport._id,
+                personnelId,
+            });
+            toast.success("Personnel allocated successfully");
+            await syncArchiveData();
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to allocate personnel");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const dispatchResourceToSelected = async (resourceId: string) => {
+        if (!selectedReport) return;
+        setActionLoading(true);
+        try {
+            await api.put(`/resources/${resourceId}/dispatch`, { incidentId: selectedReport._id });
+            toast.success("Resource sent to incident");
+            await syncArchiveData();
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to send resource");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const createAndDispatchNewResource = async () => {
+        if (!selectedReport) return;
+        setActionLoading(true);
+        try {
+            const unitCode = Math.floor(100 + Math.random() * 900);
+            const { data: createdResource } = await api.post('/resources', {
+                name: `${newResourceType.replace('_', ' ').toUpperCase()} UNIT-${unitCode}`,
+                type: newResourceType,
+                location: selectedReport.location,
+                batteryOrFuelLevel: 100,
+            });
+
+            await api.put(`/resources/${createdResource._id}/dispatch`, { incidentId: selectedReport._id });
+            toast.success("New resource created and dispatched");
+            await syncArchiveData();
+        } catch (err) {
+            console.error(err);
+            toast.error("Unable to create and dispatch new resource");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const availableResources = resources.filter((r) => r.status === 'patrol');
 
   const filteredReports = reports.filter(r => {
     if (filter !== "all" && r.status !== filter) return false;
@@ -77,7 +164,19 @@ export default function ReportsArchive() {
                         <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Reports Index</h2>
                         <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Archival Historical Data</p>
                     </div>
-                    <button className="p-3 bg-slate-50 rounded-xl border border-border/40 hover:text-primary transition-all shadow-sm">
+                                        <button
+                                            onClick={() => {
+                                                const blob = new Blob([JSON.stringify(filteredReports, null, 2)], { type: 'application/json' });
+                                                const url = URL.createObjectURL(blob);
+                                                const link = document.createElement('a');
+                                                link.href = url;
+                                                link.download = `civic-reports-${Date.now()}.json`;
+                                                link.click();
+                                                URL.revokeObjectURL(url);
+                                                toast.success("Archive exported");
+                                            }}
+                                            className="p-3 bg-slate-50 rounded-xl border border-border/40 hover:text-primary transition-all shadow-sm"
+                                        >
                         <Download className="w-5 h-5 text-slate-400" />
                     </button>
                 </div>
@@ -183,16 +282,103 @@ export default function ReportsArchive() {
                                         <Zap className="w-4 h-4 text-indigo-500" /> Confidence: <span className="text-slate-900">{selectedReport.aiPredictionConfidence}%</span>
                                     </div>
                                 </div>
+
+                                                                {(selectedReport.sourceLanguage || 'english') !== 'english' && (
+                                                                    <div className="mt-8 p-6 bg-white border border-border/40 rounded-2xl">
+                                                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-3">
+                                                                            Multilingual Archive Record
+                                                                        </p>
+                                                                        <p className="text-xs font-black text-slate-900 uppercase tracking-wide mb-2">
+                                                                            Source ({selectedReport.sourceLanguage}): {selectedReport.titleOriginal || selectedReport.title}
+                                                                        </p>
+                                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide leading-relaxed mb-4">
+                                                                            {selectedReport.detailsOriginal || selectedReport.details || 'No original description provided'}
+                                                                        </p>
+                                                                        <p className="text-xs font-black text-primary uppercase tracking-wide mb-2">
+                                                                            English normalized: {selectedReport.titleEnglish || selectedReport.title}
+                                                                        </p>
+                                                                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wide leading-relaxed">
+                                                                            {selectedReport.detailsEnglish || selectedReport.details || 'No English normalized description available'}
+                                                                        </p>
+                                                                    </div>
+                                                                )}
                             </div>
                             <div className="flex items-center gap-4">
-                                <button className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const blob = new Blob([JSON.stringify(selectedReport, null, 2)], { type: 'application/json' });
+                                                                        const url = URL.createObjectURL(blob);
+                                                                        const link = document.createElement('a');
+                                                                        link.href = url;
+                                                                        link.download = `incident-${selectedReport._id}.json`;
+                                                                        link.click();
+                                                                        URL.revokeObjectURL(url);
+                                                                    }}
+                                                                    className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all"
+                                                                >
                                     <Download className="w-5 h-5" />
                                 </button>
-                                <button className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const shareText = `Incident: ${selectedReport.title}\nStatus: ${selectedReport.status}\nSeverity: ${selectedReport.severity}`;
+                                                                        navigator.clipboard.writeText(shareText);
+                                                                        toast.success("Incident summary copied");
+                                                                    }}
+                                                                    className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all"
+                                                                >
                                     <Share2 className="w-5 h-5" />
                                 </button>
                             </div>
                         </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div className="bg-white border border-border/40 rounded-2xl p-6 space-y-4">
+                                                        <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Official Actions</h3>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                                            <button
+                                                                disabled={actionLoading}
+                                                                onClick={() => updateStatus('investigating')}
+                                                                className="px-3 py-3 rounded-xl border border-border/40 text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all disabled:opacity-50"
+                                                            >
+                                                                Allocate Case
+                                                            </button>
+                                                            <button
+                                                                disabled={actionLoading}
+                                                                onClick={() => updateStatus('active')}
+                                                                className="px-3 py-3 rounded-xl border border-border/40 text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all disabled:opacity-50"
+                                                            >
+                                                                Reopen
+                                                            </button>
+                                                            <button
+                                                                disabled={actionLoading}
+                                                                onClick={() => updateStatus('resolved')}
+                                                                className="px-3 py-3 rounded-xl border border-border/40 text-[9px] font-black uppercase tracking-widest hover:border-emerald-500 hover:text-emerald-600 transition-all disabled:opacity-50"
+                                                            >
+                                                                Mark Resolved
+                                                            </button>
+                                                        </div>
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current status: {selectedReport.status}</p>
+                                                    </div>
+
+                                                    <div className="bg-white border border-border/40 rounded-2xl p-6 space-y-4">
+                                                        <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Allocate Personnel</h3>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                            {personnel.slice(0, 4).map((p) => (
+                                                                <button
+                                                                    key={p._id}
+                                                                    disabled={actionLoading}
+                                                                    onClick={() => assignPersonnel(p._id)}
+                                                                    className="px-3 py-3 rounded-xl border border-border/40 text-left text-[9px] font-black uppercase tracking-widest hover:border-primary hover:text-primary transition-all disabled:opacity-50"
+                                                                >
+                                                                    {p.name}
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                        {personnel.length === 0 && (
+                                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No available personnel</p>
+                                                        )}
+                                                    </div>
+                                                </div>
 
                         {/* AI Analysis Grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -243,11 +429,67 @@ export default function ReportsArchive() {
                                         </div>
                                     ))}
                                 </div>
-                                <button className="w-full bg-primary py-4 rounded-xl text-white font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all">
-                                    Generate Official Report
-                                </button>
+                                                                <button
+                                                                    onClick={() => {
+                                                                        const blob = new Blob([JSON.stringify(selectedReport, null, 2)], { type: 'application/json' });
+                                                                        const url = URL.createObjectURL(blob);
+                                                                        const link = document.createElement('a');
+                                                                        link.href = url;
+                                                                        link.download = `official-incident-report-${selectedReport._id}.json`;
+                                                                        link.click();
+                                                                        URL.revokeObjectURL(url);
+                                                                        toast.success("Official report generated");
+                                                                    }}
+                                                                    className="w-full bg-primary py-4 rounded-xl text-white font-black uppercase tracking-[0.3em] text-[10px] shadow-2xl shadow-primary/30 hover:scale-[1.02] active:scale-95 transition-all"
+                                                                >
+                                                                        Generate Official Report
+                                                                </button>
                             </div>
                         </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                    <div className="plinth-card p-8 bg-white space-y-4">
+                                                        <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900">Send Existing Resource</h3>
+                                                        <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                                                            {availableResources.slice(0, 6).map((resource) => (
+                                                                <button
+                                                                    key={resource._id}
+                                                                    disabled={actionLoading}
+                                                                    onClick={() => dispatchResourceToSelected(resource._id)}
+                                                                    className="w-full flex items-center justify-between p-4 rounded-xl border border-border/40 hover:border-primary hover:text-primary transition-all disabled:opacity-50"
+                                                                >
+                                                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-700">{resource.name}</span>
+                                                                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{resource.type}</span>
+                                                                </button>
+                                                            ))}
+                                                            {availableResources.length === 0 && (
+                                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No patrol resources available</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="plinth-card p-8 bg-white space-y-4">
+                                                        <h3 className="text-xl font-black uppercase tracking-tighter text-slate-900">Create New Resource</h3>
+                                                        <select
+                                                            value={newResourceType}
+                                                            onChange={(e) => setNewResourceType(e.target.value as "police" | "fire" | "medical" | "public_works" | "drone")}
+                                                            className="w-full bg-slate-50 border border-border/40 rounded-xl px-4 py-3 text-[10px] font-black uppercase tracking-widest"
+                                                        >
+                                                            <option value="public_works">Public Works</option>
+                                                            <option value="police">Police</option>
+                                                            <option value="fire">Fire</option>
+                                                            <option value="medical">Medical</option>
+                                                            <option value="drone">Drone</option>
+                                                        </select>
+                                                        <button
+                                                            disabled={actionLoading}
+                                                            onClick={createAndDispatchNewResource}
+                                                            className="w-full bg-slate-900 py-4 rounded-xl text-white font-black uppercase tracking-[0.3em] text-[10px] hover:bg-black transition-all disabled:opacity-50"
+                                                        >
+                                                            Create + Dispatch
+                                                        </button>
+                                                    </div>
+                                                </div>
 
                         {/* Visual Evidence / Timeline */}
                         <div className="space-y-8">

@@ -9,6 +9,9 @@ CivicResource Ai is a high-fidelity, full-stack "Digital Twin" platform designed
 *   **📡 Citizen Reporting**: Seamless incident submission flow with automatic priority triage.
 *   **🚛 Driver HUD**: Dedicated unit-task assignment interface for field operations.
 *   **🔐 HUD Security**: Enterprise-grade JWT authentication and protected route architecture.
+*   **🧠 Demand Prediction Engine**: Zone demand is predicted using a blended ensemble model (Random Forest + Gradient Boosting) with weather, complaint history, event factor, and population density inputs.
+*   **🎯 Smart Allocation Suggestions**: AI now generates resource-to-zone recommendations using urgency-ranked demand and travel-distance-aware assignment.
+*   **🔄 Real-Time Optimization Loop**: Intelligence Matrix runs live AI pulse analysis and continuously refreshes demand/allocation insights.
 
 ## 🛠️ Technology Stack
 
@@ -17,6 +20,7 @@ CivicResource Ai is a high-fidelity, full-stack "Digital Twin" platform designed
 | **Frontend** | React 18, Vite, Tailwind CSS, Framer Motion, Recharts, Lucide Icons |
 | **Backend** | Node.js, Express, MongoDB (Mongoose), JSON Web Token (JWT), Bcrypt |
 | **State/API** | React Query (TanStack), Axios with HTTP Interceptors |
+| **AI Engine** | FastAPI, scikit-learn (DBSCAN, RandomForestRegressor, GradientBoostingRegressor), NumPy, spaCy |
 
 ---
 
@@ -80,3 +84,14 @@ CivicResource Ai uses a **Decoupled Private Backend** architecture:
 - The frontend resides in `/client`.
 - The backend resides in `/server`.
 - All dashboard routes (`/app/*`) are guarded by a `ProtectedRoute` component that validates sessions against the server.
+
+### AI Optimization Flow
+- Data Input System: incidents are aggregated into geo-zones with derived features (complaints, weather proxy, event factor, population density).
+- Demand Prediction Engine: ensemble forecasting ranks zones by urgency and predicts recommended units.
+- Smart Allocation: available resources are matched to urgent zones using a distance-aware greedy optimizer.
+- Interactive Dashboard Output: Intelligence Matrix and Strategic views consume these outputs (`demandForecast`, `allocationPlan`, `allocationSummary`, `strategicAdvice`) for actionable UI.
+
+### New AI/Backend Endpoints Used
+- `POST /analyze/demand-forecast` (AI engine): urgency-ranked demand forecast.
+- `POST /analyze/resource-allocation` (AI engine): resource-to-zone optimized recommendations.
+- `POST /api/dispatch/ai-analyze` (backend): combined clusters, heatmap, demand, and allocation payload for frontend.

@@ -1,5 +1,32 @@
 import Resource from '../models/Resource.js';
 
+// @desc    Create a new resource
+// @route   POST /api/resources
+// @access  Private
+export const createResource = async (req, res, next) => {
+  try {
+    const {
+      name,
+      type,
+      status,
+      location,
+      batteryOrFuelLevel,
+    } = req.body;
+
+    const resource = await Resource.create({
+      name,
+      type,
+      status: status || 'patrol',
+      location,
+      batteryOrFuelLevel: batteryOrFuelLevel ?? 100,
+    });
+
+    res.status(201).json(resource);
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Get all resources
 // @route   GET /api/resources
 // @access  Private

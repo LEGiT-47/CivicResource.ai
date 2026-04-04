@@ -4,8 +4,8 @@ import { protect } from '../middleware/authMiddleware.js'; // Assuming auth midd
 
 const router = express.Router();
 
-router.route('/personnel').get(getAvailablePersonnel);
-router.route('/assign').post(assignPersonnel);
-router.route('/ai-analyze').post(getAIAnalysis);
+router.route('/personnel').get(protect, getAvailablePersonnel);
+router.route('/assign').post(protect, assignPersonnel);
+router.route('/ai-analyze').post(protect, getAIAnalysis);
 
 export default router;

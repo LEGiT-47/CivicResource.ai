@@ -21,11 +21,13 @@ app.get('/', (req, res) => {
 
 import authRoutes from './routes/authRoutes.js';
 import incidentRoutes from './routes/incidentRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
 import resourceRoutes from './routes/resourceRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import dispatchRoutes from './routes/dispatchRoutes.js';
 
 app.use('/api/auth', authRoutes);
+app.use('/api/public', publicRoutes);
 app.use('/api/incidents', incidentRoutes);
 app.use('/api/resources', resourceRoutes);
 app.use('/api/dashboard', analyticsRoutes);

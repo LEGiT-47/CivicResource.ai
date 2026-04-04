@@ -18,7 +18,15 @@ const priorityStyles = {
   low: "border-emerald-500 bg-emerald-500/5",
 };
 
-function IncidentItem({ incident }: { incident: any }) {
+function IncidentItem({
+  incident,
+  isSelected,
+  onSelect,
+}: {
+  incident: any;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+}) {
   const Icon = categoryIcon[incident.type] || AlertTriangle;
   
   return (
@@ -27,8 +35,10 @@ function IncidentItem({ incident }: { incident: any }) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, scale: 0.95 }}
       whileHover={{ x: 6 }}
+      onClick={() => onSelect(incident._id)}
       className={cn(
-        "p-6 border-l-[6px] rounded-2xl mb-4 cursor-pointer transition-all bg-white shadow-tactile border border-border/40 group active:scale-[0.98]",
+        "p-6 border-l-[6px] rounded-2xl mb-4 cursor-pointer transition-all bg-white shadow-tactile border group active:scale-[0.98]",
+        isSelected ? "border-primary ring-2 ring-primary/20" : "border-border/40",
         priorityStyles[incident.severity as keyof typeof priorityStyles] || priorityStyles.medium
       )}
     >
@@ -66,14 +76,31 @@ function IncidentItem({ incident }: { incident: any }) {
   );
 }
 
-export default function LiveFeed({ incidents }: { incidents: any[] }) {
+export default function LiveFeed({
+  incidents,
+  selectedIncidentId,
+  onSelectIncident,
+  maxItems,
+}: {
+  incidents: any[];
+  selectedIncidentId?: string | null;
+  onSelectIncident?: (id: string) => void;
+  maxItems?: number;
+}) {
+  const displayedIncidents = typeof maxItems === "number" ? incidents.slice(0, maxItems) : incidents.slice(0, 15);
+
   return (
     <div className="w-full h-full flex flex-col bg-white overflow-hidden p-8">
       <div className="flex-1 overflow-y-auto space-y-2 -mx-2 px-2 custom-scrollbar pr-4">
         <AnimatePresence mode="popLayout">
-          {incidents.length > 0 ? (
-            incidents.slice(0, 15).map((incident) => (
-              <IncidentItem key={incident._id} incident={incident} />
+          {displayedIncidents.length > 0 ? (
+            displayedIncidents.map((incident) => (
+              <IncidentItem
+                key={incident._id}
+                incident={incident}
+                isSelected={selectedIncidentId === incident._id}
+                onSelect={onSelectIncident || (() => {})}
+              />
             ))
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-20 opacity-40">

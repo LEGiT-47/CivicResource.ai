@@ -1,21 +1,36 @@
 import { NavLink } from "@/components/NavLink";
 import { useLocation, useNavigate } from "react-router-dom";
-import { 
-  Map, BarChart3, FileText, Truck, AlertTriangle, 
-  Menu, X, Zap, LogOut, Bell, User, Settings, ShieldCheck,
-  Search, LayoutGrid, Activity, Send, Archive
+import {
+  Menu,
+  X,
+  Zap,
+  LogOut,
+  Bell,
+  User,
+  Settings,
+  ShieldCheck,
+  Search,
+  LayoutGrid,
+  Activity,
+  Send,
+  Archive,
+  Truck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { getSessionRole, getStoredUser } from "@/lib/session";
 
-const navItems = [
+const workerNavItems = [
+  { to: "/app", label: "Strategic Map", icon: LayoutGrid },
+  { to: "/app/driver", label: "Operational HUD", icon: Truck },
+];
+
+const adminNavItems = [
   { to: "/app", label: "Strategic Map", icon: LayoutGrid },
   { to: "/app/dispatch", label: "Live Dispatch", icon: Send },
   { to: "/app/archive", label: "Incident Archive", icon: Archive },
   { to: "/app/intelligence", label: "Intelligence Matrix", icon: Activity },
-  { to: "/app/report", label: "Field Induction", icon: FileText },
-  { to: "/app/driver", label: "Operational HUD", icon: Truck },
 ];
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
@@ -23,6 +38,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const sessionRole = getSessionRole() || "worker";
+  const storedUser = getStoredUser();
+  const navItems = sessionRole === "admin" ? adminNavItems : workerNavItems;
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -33,21 +51,20 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const handleLogout = () => {
     localStorage.removeItem("CivicFlow_token");
     localStorage.removeItem("CivicFlow_user");
-    navigate("/login");
+    navigate("/");
   };
 
   return (
     <div className="flex h-screen bg-background overflow-hidden selection:bg-primary/10">
-      {/* ── SIDEBAR: The Chassis ────────────────────────────────────────────── */}
       <aside className="hidden lg:flex flex-col w-[280px] bg-white border-r border-border/40 shadow-[20px_0_40px_-20px_rgba(0,0,0,0.02)] z-30 transition-all duration-500">
         <div className="p-8 mb-4">
-          <div className="flex items-center gap-3.5 group cursor-pointer" onClick={() => navigate("/app")}>
+          <div className="flex items-center gap-3.5 group cursor-pointer" onClick={() => navigate("/app") }>
             <div className="w-11 h-11 rounded-2xl bg-primary flex items-center justify-center shadow-xl shadow-primary/20 group-hover:scale-105 transition-transform">
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-black tracking-tighter text-slate-900 uppercase leading-none">CivicFlow</h1>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1 block">District Node 07</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1 block">{sessionRole === "admin" ? "Admin Console" : "Field Relay"}</span>
             </div>
           </div>
         </div>
@@ -55,8 +72,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="px-6 mb-8">
            <div className="relative group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-primary transition-colors" />
-              <input 
-                placeholder="Global Protocol Search..." 
+              <input
+                placeholder={sessionRole === "admin" ? "Search admin records..." : "Search field incidents..."}
                 className="w-full bg-slate-50 border-none rounded-2xl pl-12 pr-4 py-3.5 text-[11px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-primary/20 transition-all"
               />
            </div>
@@ -64,7 +81,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 px-4 space-y-2 overflow-y-auto custom-scrollbar">
            <div className="px-5 mb-4">
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">Strategic Control</span>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">{sessionRole === "admin" ? "Administrative Control" : "Field Control"}</span>
            </div>
            {navItems.map((item) => (
              <NavLink
@@ -87,8 +104,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                    <User className="w-5 h-5 text-slate-600" />
                 </div>
                 <div>
-                   <p className="text-[11px] font-black text-slate-900 leading-none">ADMIN_SEC_07</p>
-                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Status: Active</p>
+                   <p className="text-[11px] font-black text-slate-900 leading-none">{storedUser?.name || (sessionRole === "admin" ? "ADMIN_SEC_07" : "FIELD_WORKER")}</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Status: {sessionRole === "admin" ? "Control Active" : "Field Active"}</p>
                 </div>
              </div>
              <button onClick={handleLogout} className="p-2.5 rounded-xl hover:bg-destructive/10 text-slate-400 hover:text-destructive transition-all">
@@ -97,7 +114,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-2 p-1 bg-white rounded-2xl border border-slate-100 shadow-sm">
              <div className="flex-1 flex items-center gap-2 px-3 py-2 text-[10px] font-black text-primary uppercase">
-                <ShieldCheck className="w-4 h-4" /> SECURE_SSL_V3
+                <ShieldCheck className="w-4 h-4" /> {sessionRole === "admin" ? "ADMIN_ACCESS" : "FIELD_ACCESS"}
              </div>
              <div className="h-4 w-px bg-slate-100" />
              <button className="p-2 text-slate-400 hover:text-primary transition-colors">
@@ -107,9 +124,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* ── MAIN: The Workspace ──────────────────────────────────────────────────────── */}
       <div className="flex-1 flex flex-col min-w-0 bg-background relative overflow-hidden">
-        {/* Top Header Layer */}
         <header className={cn(
           "h-20 flex items-center justify-between px-8 z-20 transition-all duration-300",
           isScrolled ? "bg-white/80 backdrop-blur-xl border-b border-border/40" : "bg-transparent"
@@ -119,7 +134,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                  <Menu className="w-6 h-6" />
               </button>
               <div className="hidden lg:flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-[0.4em]">
-                 <LayoutGrid className="w-4 h-4" /> Operation Pulse / <span className="text-primary italic">Live Relay</span>
+                 <LayoutGrid className="w-4 h-4" /> {sessionRole === "admin" ? "Admin Console" : "Field Relay"} / <span className="text-primary italic">Live Relay</span>
               </div>
            </div>
 
@@ -138,7 +153,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
            </div>
         </header>
 
-        {/* Dynamic Nested Content */}
         <main className="flex-1 overflow-auto custom-scrollbar relative">
            <AnimatePresence mode="wait">
              <motion.div
@@ -154,10 +168,9 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
            </AnimatePresence>
         </main>
 
-        {/* Floating Mobile Nav Overlay */}
         <AnimatePresence>
           {mobileOpen && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

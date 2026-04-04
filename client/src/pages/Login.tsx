@@ -2,15 +2,17 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   Zap, ArrowRight, Mail, Lock, 
-  ShieldCheck, Activity, Globe2, ChevronLeft
+   ShieldCheck, Activity, Globe2, ChevronLeft, Users, Eye, EyeOff
 } from "lucide-react";
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { normalizeRole } from "@/lib/session";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -21,9 +23,16 @@ export default function Login() {
     setError("");
     try {
       const { data } = await api.post("/auth/login", { email, password });
+      const normalizedRole = normalizeRole(data.role) || "worker";
       localStorage.setItem("CivicFlow_token", data.token);
-      localStorage.setItem("CivicFlow_user", JSON.stringify(data.user));
-      navigate("/app");
+         localStorage.setItem("CivicFlow_user", JSON.stringify({
+            _id: data._id,
+            name: data.name,
+            email: data.email,
+            organization: data.organization,
+            role: normalizedRole,
+         }));
+      navigate(normalizedRole === "admin" ? "/app" : "/app/driver");
     } catch (err: any) {
       setError(err.response?.data?.message || "Protocol rejection: Invalid credentials.");
     } finally {
@@ -47,12 +56,12 @@ export default function Login() {
                <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicFlow</span>
             </div>
 
-            <h1 className="text-6xl font-black uppercase tracking-tighter text-slate-900 mb-4 leading-none italic">Portal <span className="text-primary not-italic">Induction</span></h1>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-16 leading-relaxed">Authorized municipal relay access only. Syncing link v4.0.</p>
+            <h1 className="text-6xl font-black uppercase tracking-tighter text-slate-900 mb-4 leading-none italic">Staff <span className="text-primary not-italic">Login</span></h1>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-16 leading-relaxed">For workers and admins only. Citizens should use complaint and tracker pages.</p>
 
             <form onSubmit={handleLogin} className="space-y-8">
                <div className="space-y-3">
-                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-2">Protocol Identity</label>
+                  <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-2">Staff Identity</label>
                   <div className="relative group">
                      <Mail className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-primary transition-colors" />
                      <input 
@@ -70,13 +79,21 @@ export default function Login() {
                   <div className="relative group">
                      <Lock className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-primary transition-colors" />
                      <input 
-                        type="password" 
+                        type={showPassword ? "text" : "password"}
                         required
                         placeholder="••••••••••••" 
-                        className="concierge-input w-full pl-16 py-5 bg-slate-50 focus:bg-white text-xs font-black uppercase tracking-widest"
+                        className="concierge-input w-full pl-16 pr-16 py-5 bg-slate-50 focus:bg-white text-xs font-black uppercase tracking-widest"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                      />
+                     <button
+                        type="button"
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-lg text-slate-400 hover:text-primary transition-colors"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                     >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                     </button>
                   </div>
                </div>
 
@@ -94,11 +111,21 @@ export default function Login() {
                >
                   {loading ? <Activity className="w-5 h-5 animate-spin" /> : <>Finalize Sync <ArrowRight className="w-5 h-5" /></>}
                </button>
+
+               <Link
+                  to="/signup"
+                  className="block w-full py-5 rounded-2xl border border-border/40 bg-white text-slate-700 text-[10px] text-center font-black uppercase tracking-[0.3em] hover:border-primary hover:text-primary transition-all"
+               >
+                  Request Staff Signup
+               </Link>
             </form>
 
             <div className="mt-16 pt-12 border-t border-slate-50 flex flex-col gap-6">
-               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Protocol registry missing?</p>
-               <Link to="/signup" className="text-[10px] font-black text-primary uppercase tracking-[0.3em] underline decoration-2 underline-offset-4 hover:text-black transition-colors">Request New Induction Account</Link>
+               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Need citizen services?</p>
+               <div className="flex flex-wrap gap-4">
+                  <Link to="/complaint" className="text-[10px] font-black text-primary uppercase tracking-[0.3em] underline decoration-2 underline-offset-4 hover:text-black transition-colors">File a Complaint</Link>
+                  <Link to="/track" className="text-[10px] font-black text-primary uppercase tracking-[0.3em] underline decoration-2 underline-offset-4 hover:text-black transition-colors">Track Complaint</Link>
+               </div>
             </div>
         </div>
 
@@ -106,6 +133,9 @@ export default function Login() {
            <div className="flex gap-10">
               <span className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-400 flex items-center gap-2">
                  <Globe2 className="w-3.5 h-3.5" /> SECURE_LINK_SSL
+              </span>
+              <span className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-400 flex items-center gap-2">
+                 <Users className="w-3.5 h-3.5" /> STAFF_ONLY
               </span>
            </div>
            <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-400">© 2026 REGISTRY</p>

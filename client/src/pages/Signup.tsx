@@ -8,13 +8,14 @@ import {
 import { motion } from "framer-motion";
 import api from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { normalizeRole } from "@/lib/session";
 
 export default function Signup() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
-    role: "citizen"
+      role: "worker"
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,8 +26,7 @@ export default function Signup() {
     setLoading(true);
     setError("");
     try {
-      // Map UI roles to backend enums
-      const backendRole = formData.role === "citizen" ? "operator" : "admin";
+      const backendRole = formData.role === "admin" ? "admin" : "responder";
       
       const payload = {
         name: formData.name,
@@ -38,8 +38,15 @@ export default function Signup() {
 
       const { data } = await api.post("/auth/register", payload);
       localStorage.setItem("CivicFlow_token", data.token);
-      localStorage.setItem("CivicFlow_user", JSON.stringify(data.user));
-      navigate("/app");
+      localStorage.setItem("CivicFlow_user", JSON.stringify({
+        _id: data._id,
+        name: data.name,
+        email: data.email,
+        organization: data.organization,
+        role: data.role,
+      }));
+         const normalizedRole = normalizeRole(data.role) || (formData.role === "admin" ? "admin" : "worker");
+         navigate(normalizedRole === "admin" ? "/app" : "/app/driver");
     } catch (err: any) {
       setError(err.response?.data?.message || "Protocol rejection: Registration failed.");
     } finally {
@@ -63,8 +70,8 @@ export default function Signup() {
                <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicFlow</span>
             </div>
 
-            <h1 className="text-6xl font-black uppercase tracking-tighter text-slate-900 mb-4 leading-none italic">New <span className="text-primary not-italic">Induction</span></h1>
-            <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-16 leading-relaxed">Request official municipal registry access. Protocols 4.0 sync active.</p>
+            <h1 className="text-6xl font-black uppercase tracking-tighter text-slate-900 mb-4 leading-none italic">Staff <span className="text-primary not-italic">Induction</span></h1>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-16 leading-relaxed">For worker and admin accounts only. Public users should not sign up here.</p>
 
             <form onSubmit={handleSignup} className="space-y-8">
                <div className="space-y-3">
@@ -113,7 +120,7 @@ export default function Signup() {
                <div className="space-y-3">
                   <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-2">Operational Role</label>
                   <div className="grid grid-cols-2 gap-4">
-                     {(["citizen", "authority"] as const).map(role => (
+                     {(["worker", "admin"] as const).map(role => (
                        <button
                          key={role}
                          type="button"
@@ -147,7 +154,7 @@ export default function Signup() {
 
             <div className="mt-16 pt-12 border-t border-slate-50 flex flex-col gap-6">
                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Protocol already synchronized?</p>
-               <Link to="/login" className="text-[10px] font-black text-primary uppercase tracking-[0.3em] underline decoration-2 underline-offset-4 hover:text-black transition-colors">Return to Access Portal</Link>
+               <Link to="/login" className="text-[10px] font-black text-primary uppercase tracking-[0.3em] underline decoration-2 underline-offset-4 hover:text-black transition-colors">Return to Staff Login</Link>
             </div>
         </div>
 

@@ -14,6 +14,9 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import DispatchSystem from "./pages/DispatchSystem";
 import ReportsArchive from "./pages/ReportsArchive";
+import PublicArchive from "./pages/PublicArchive";
+import ComplaintTracker from "./pages/ComplaintTracker";
+import PublicComplaintDetail from "./pages/PublicComplaintDetail";
 import NotFound from "./pages/NotFound";
 
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -29,18 +32,27 @@ const App = () => (
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<Landing />} />
+          <Route path="/complaint" element={<CitizenReport />} />
+          <Route path="/archive" element={<PublicArchive />} />
+          <Route path="/archive/:id" element={<PublicComplaintDetail />} />
+          <Route path="/track" element={<ComplaintTracker />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
 
           {/* Protected Application Routes */}
-          <Route element={<ProtectedRoute />}>
+          <Route element={<ProtectedRoute allowedRoles={["worker", "admin"]} />}>
             <Route path="/app" element={<AppLayout><CommandCenter /></AppLayout>} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
             <Route path="/app/intelligence" element={<AppLayout><IntelligenceHub /></AppLayout>} />
-            <Route path="/app/report" element={<AppLayout><CitizenReport /></AppLayout>} />
             <Route path="/app/dispatch" element={<AppLayout><DispatchSystem /></AppLayout>} />
             <Route path="/app/archive" element={<AppLayout><ReportsArchive /></AppLayout>} />
-            <Route path="/app/driver" element={<AppLayout><DriverHUD /></AppLayout>} />
             <Route path="/app/escalation" element={<AppLayout><Escalation /></AppLayout>} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={["worker"]} />}>
+            <Route path="/app/driver" element={<AppLayout><DriverHUD /></AppLayout>} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

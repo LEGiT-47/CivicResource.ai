@@ -7,11 +7,15 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
+import { toast } from "sonner";
 
 export default function DriverHUD() {
   const [activeIncident, setActiveIncident] = useState<any>(null);
   const [incidents, setIncidents] = useState<any[]>([]);
+   const [incidentFilter, setIncidentFilter] = useState("");
   const [loading, setLoading] = useState(true);
+   const [isRouting, setIsRouting] = useState(false);
+   const [isCompleting, setIsCompleting] = useState(false);
 
   useEffect(() => {
     const fetchIncidents = async () => {
@@ -20,6 +24,9 @@ export default function DriverHUD() {
         setIncidents(data);
         if (!activeIncident && data.length > 0) {
           setActiveIncident(data.find((i: any) => i.severity === 'critical') || data[0]);
+            } else if (activeIncident) {
+               const refreshedActive = data.find((i: any) => i._id === activeIncident._id);
+               if (refreshedActive) setActiveIncident(refreshedActive);
         }
       } catch (err) {
         console.error("DriverHUD fetch failed", err);
@@ -28,7 +35,73 @@ export default function DriverHUD() {
       }
     };
     fetchIncidents();
+      const interval = setInterval(fetchIncidents, 10000);
+      return () => clearInterval(interval);
   }, []);
+
+   const handleInitializeRoute = async () => {
+      if (!activeIncident) return;
+      setIsRouting(true);
+      try {
+         await api.put(`/incidents/${activeIncident._id}/status`, { status: 'investigating' });
+         toast.success("Route initialized and status updated to investigating");
+         const { data } = await api.get('/incidents');
+         setIncidents(data);
+         const refreshed = data.find((i: any) => i._id === activeIncident._id);
+         if (refreshed) setActiveIncident(refreshed);
+      } catch (err) {
+         toast.error("Failed to initialize route");
+         console.error(err);
+      } finally {
+         setIsRouting(false);
+      }
+   };
+
+   const handleMarkResolved = async () => {
+      if (!activeIncident) return;
+      setIsCompleting(true);
+      try {
+         await api.put(`/incidents/${activeIncident._id}/status`, { status: 'resolved' });
+         toast.success("Incident marked resolved");
+         const { data } = await api.get('/incidents');
+         setIncidents(data);
+         const next = data.find((i: any) => i.severity === 'critical') || data[0] || null;
+         setActiveIncident(next);
+      } catch (err) {
+         toast.error("Failed to mark incident resolved");
+         console.error(err);
+      } finally {
+         setIsCompleting(false);
+      }
+   };
+
+   const handleControlRoomCall = async () => {
+      const phone = "+91-22-4000-0100";
+      try {
+         await navigator.clipboard.writeText(phone);
+         toast.success(`Control room number copied: ${phone}`);
+      } catch {
+         toast.error("Unable to copy control room number");
+      }
+   };
+
+   const filteredIncidents = incidents.filter((incident) => {
+      const q = incidentFilter.trim().toLowerCase();
+      if (!q) return true;
+      return (
+         String(incident._id || "").toLowerCase().includes(q) ||
+         String(incident.title || "").toLowerCase().includes(q) ||
+         String(incident.location?.address || "").toLowerCase().includes(q)
+      );
+   });
+
+   const topologyBars = Array.from({ length: 42 }).map((_, i) => {
+      const base = 18 + (i % 7) * 10;
+      const sevBonus = activeIncident?.severity === 'critical' ? 12 : activeIncident?.severity === 'high' ? 8 : 4;
+      return Math.min(96, base + sevBonus);
+   });
+
+   const etaMinutes = activeIncident?.severity === 'critical' ? 8 : activeIncident?.severity === 'high' ? 12 : 18;
 
   if (loading) return (
     <div className="h-full flex items-center justify-center bg-white">
@@ -83,17 +156,24 @@ export default function DriverHUD() {
                         <Info className="w-6 h-6 text-secondary mt-1 shrink-0" />
                         <div>
                            <p className="text-[9px] font-black uppercase tracking-[0.4em] opacity-40 mb-1">Signal Parameters</p>
-                           <p className="text-[11px] font-bold opacity-80 uppercase leading-relaxed tracking-wider">{activeIncident.description}</p>
+                           <p className="text-[11px] font-bold opacity-80 uppercase leading-relaxed tracking-wider">{activeIncident.details || 'No additional field notes provided.'}</p>
                         </div>
                      </div>
                   </div>
                </div>
 
                <div className="mt-auto flex gap-4 relative z-10 pt-12">
-                  <button className="flex-1 py-6 rounded-2xl bg-white text-slate-900 text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3">
-                     <Navigation className="w-4 h-4" /> Initialize Route
+                  <button
+                    onClick={handleInitializeRoute}
+                    disabled={isRouting}
+                    className="flex-1 py-6 rounded-2xl bg-white text-slate-900 text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                     <Navigation className="w-4 h-4" /> {isRouting ? 'Routing...' : 'Initialize Route'}
                   </button>
-                  <button className="p-6 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-all">
+                  <button
+                    onClick={handleControlRoomCall}
+                    className="p-6 rounded-2xl bg-white/10 border border-white/10 text-white hover:bg-white/20 transition-all"
+                  >
                      <Phone className="w-5 h-5" />
                   </button>
                </div>
@@ -108,9 +188,9 @@ export default function DriverHUD() {
                      </div>
                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-2 block">District Topology</span>
                      <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Active Proximity</h4>
-                     <div className="mt-8 flex items-end gap-1.5 h-20 w-full animate-pulse">
-                        {Array.from({ length: 42 }).map((_, i) => (
-                           <div key={i} className="flex-1 bg-primary/20 rounded-t-sm" style={{ height: `${20 + Math.random() * 80}%` }} />
+                     <div className="mt-8 flex items-end gap-1.5 h-20 w-full">
+                        {topologyBars.map((height, i) => (
+                           <div key={i} className="flex-1 bg-primary/20 rounded-t-sm" style={{ height: `${height}%` }} />
                         ))}
                      </div>
                   </div>
@@ -122,7 +202,7 @@ export default function DriverHUD() {
                         <div className="w-1.5 h-1.5 rounded-full bg-secondary shadow-lg shadow-secondary" />
                         <span className="text-[10px] font-black text-secondary uppercase tracking-[0.3em]">Estimated Arrivals</span>
                      </div>
-                     <div className="text-4xl font-black tracking-tighter text-slate-900">08:42</div>
+                     <div className="text-4xl font-black tracking-tighter text-slate-900">{String(etaMinutes).padStart(2, '0')}:00</div>
                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Relative to Vector Flow</span>
                   </div>
                   <div className="plinth-card bg-white p-8 flex flex-col justify-center border-none">
@@ -130,9 +210,19 @@ export default function DriverHUD() {
                         <Signal className="w-4 h-4" />
                         <span className="text-[10px] font-black uppercase tracking-[0.3em]">Link Status</span>
                      </div>
-                     <div className="text-4xl font-black tracking-tighter text-slate-900 uppercase tracking-tight">OPTIMAL</div>
+                     <div className="text-4xl font-black tracking-tighter text-slate-900 uppercase tracking-tight">{activeIncident.status === 'investigating' ? 'ENGAGED' : 'OPTIMAL'}</div>
                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Network Reliability 99.8%</span>
                   </div>
+               </div>
+
+               <div className="mt-8">
+                 <button
+                    onClick={handleMarkResolved}
+                    disabled={isCompleting}
+                    className="w-full py-4 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-50"
+                 >
+                    {isCompleting ? 'Completing...' : 'Mark Incident Resolved'}
+                 </button>
                </div>
             </div>
           </div>
@@ -157,13 +247,15 @@ export default function DriverHUD() {
                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                <input 
                   placeholder="Filter by Protocol ID..."
+                  value={incidentFilter}
+                  onChange={(e) => setIncidentFilter(e.target.value)}
                   className="w-full bg-white border-none rounded-2xl pl-16 pr-6 py-5 text-[10px] font-black uppercase tracking-widest shadow-sm outline-none focus:ring-2 focus:ring-primary/20 transition-all"
                />
             </div>
          </div>
 
          <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-            {incidents.map((incident) => (
+            {filteredIncidents.map((incident) => (
               <motion.button
                 key={incident._id}
                 whileHover={{ scale: 1.02, x: 5 }}
@@ -188,10 +280,15 @@ export default function DriverHUD() {
                 <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-tight mb-2">{incident.title}</h4>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{incident.location?.address}</p>
                 <div className="mt-8 flex items-center gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest group">
-                   Initialize Data <ArrowRight className="w-3.5 h-3.5" />
+                            Load Incident <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </motion.button>
             ))}
+                  {filteredIncidents.length === 0 && (
+                     <div className="rounded-2xl border border-border/40 p-8 text-center">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No incidents match your filter.</p>
+                     </div>
+                  )}
          </div>
 
          <div className="p-8 border-t border-border/40 bg-slate-50/50 flex items-center justify-between">
