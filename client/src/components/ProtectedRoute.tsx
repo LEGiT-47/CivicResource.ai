@@ -6,7 +6,7 @@ type ProtectedRouteProps = {
 };
 
 export const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-  const token = localStorage.getItem("CivicFlow_token");
+  const token = localStorage.getItem("CivicResource_token") || localStorage.getItem("CivicFlow_token");
   const sessionRole = getSessionRole();
 
   if (!token) {

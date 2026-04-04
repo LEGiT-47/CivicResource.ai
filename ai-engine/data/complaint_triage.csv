@@ -1,0 +1,30 @@
+text,intent,is_fake
+"Water shortage in my apartment block for two days","water",0
+"No tanker arrived in our ward and taps are dry","water",0
+"Low water pressure and supply failure near the colony","water",0
+"Garbage overflowing from bins behind the market","garbage",0
+"Trash collection missed for three mornings","garbage",0
+"Smelly waste pileup outside the school gate","garbage",0
+"Deep pothole on the road near the signal","roads",0
+"Broken street and damaged road surface causing accidents","roads",0
+"Road blockage after heavy rain needs repair","roads",0
+"Open drain and sewer damage on the lane","maintenance",0
+"Streetlight is broken and needs maintenance","maintenance",0
+"Repair the drainage cover near the junction","maintenance",0
+"Transformer trip and power outage in the block","utility",0
+"Electricity fault with repeated voltage drops","utility",0
+"Water pump and utility line failure in the area","utility",0
+"Suspicious person threatening residents near the park","safety",0
+"Fire risk in the building stairwell","safety",0
+"Unsafe crowd and fight outside the station","safety",0
+"General civic issue in the neighborhood","general",0
+"Need help with a municipal problem at this address","general",0
+"Public complaint about a service issue","general",0
+"test test test","general",1
+"hello world","general",1
+"dummy report please ignore","general",1
+"buy now limited offer","general",1
+"asdf qwer zxcv","general",1
+"this is fake complaint data","general",1
+"call me back for prize money","general",1
+"lorem ipsum dolor sit amet","general",1

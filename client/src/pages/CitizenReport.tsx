@@ -129,6 +129,8 @@ export default function CitizenReport() {
       setStep(4);
     } catch (err) {
       console.error("Incident report failed", err);
+      const message = (err as any)?.response?.data?.message || (err as any)?.message || "Unable to submit complaint";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
     }
@@ -512,6 +514,16 @@ export default function CitizenReport() {
                 <p className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mt-3 leading-relaxed">
                   Use this ID or your mobile number on the tracker page.
                 </p>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-border/40 bg-slate-50 p-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">AI Service Family</p>
+                    <p className="mt-2 text-sm font-black uppercase tracking-tight text-slate-900">{submittedIncident?.aiTriage?.resourceFamily || submittedIncident?.type || "general"}</p>
+                  </div>
+                  <div className="rounded-xl border border-border/40 bg-slate-50 p-4">
+                    <p className="text-[9px] font-black uppercase tracking-[0.25em] text-slate-400">AI Confidence</p>
+                    <p className="mt-2 text-sm font-black uppercase tracking-tight text-slate-900">{submittedIncident?.aiPredictionConfidence ? `${submittedIncident.aiPredictionConfidence}%` : "--"}</p>
+                  </div>
+                </div>
               </div>
 
               <button
@@ -539,7 +551,7 @@ export default function CitizenReport() {
 
       <footer className="p-8 border-t border-border/40 text-center">
         <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.5em] flex items-center justify-center gap-3">
-          <Shield className="w-4 h-4 opacity-30" /> CivicFlow Field Protocol Registry v2.4.1
+          <Shield className="w-4 h-4 opacity-30" /> CivicResource.ai Field Protocol Registry v2.4.1
         </p>
       </footer>
     </div>

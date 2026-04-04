@@ -51,7 +51,7 @@ export default function Landing() {
           <div className="flex items-center gap-3">
             <BrandMark className="w-10 h-10 shadow-lg" letterClassName="text-lg" />
             <div>
-              <div className="text-lg font-black tracking-tight text-slate-900">CivicFlow Mumbai</div>
+              <div className="text-lg font-black tracking-tight text-slate-900">CivicResource.ai Mumbai</div>
               <div className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{text.badge}</div>
             </div>
           </div>

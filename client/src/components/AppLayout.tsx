@@ -52,6 +52,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   const handleLogout = () => {
+    localStorage.removeItem("CivicResource_token");
+    localStorage.removeItem("CivicResource_user");
     localStorage.removeItem("CivicFlow_token");
     localStorage.removeItem("CivicFlow_user");
     navigate("/");
@@ -68,7 +70,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3.5 group cursor-pointer" onClick={() => navigate("/app") }>
             <BrandMark className="w-11 h-11 group-hover:scale-105 transition-transform" letterClassName="text-xl" />
             <div>
-              <h1 className="text-xl font-black tracking-tighter text-slate-900 uppercase leading-none">CivicFlow</h1>
+              <h1 className="text-xl font-black tracking-tighter text-slate-900 uppercase leading-none">CivicResource.ai</h1>
               <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary mt-1 block">{sessionRole === "admin" ? "Admin Console" : "Field Relay"}</span>
             </div>
           </div>
@@ -200,7 +202,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                <div className="p-8 flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <BrandMark className="w-10 h-10 shadow-lg" letterClassName="text-lg" />
-                    <span className="font-black text-2xl tracking-tighter uppercase">CivicFlow</span>
+                    <span className="font-black text-2xl tracking-tighter uppercase">CivicResource.ai</span>
                   </div>
                   <button onClick={() => setMobileOpen(false)} className="p-3 rounded-2xl bg-slate-50"><X className="w-7 h-7" /></button>
                </div>

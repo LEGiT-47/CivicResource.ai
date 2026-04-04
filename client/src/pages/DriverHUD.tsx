@@ -163,7 +163,7 @@ export default function DriverHUD() {
          const resp = await api.get('/dispatch/my-assignments');
          data = resp.data || [];
       } catch (err: any) {
-         const stored = localStorage.getItem('CivicFlow_user');
+         const stored = localStorage.getItem('CivicResource_user') || localStorage.getItem('CivicFlow_user');
          const parsed = stored ? JSON.parse(stored) : null;
          const unitId = String(parsed?.unitId || '').trim();
 

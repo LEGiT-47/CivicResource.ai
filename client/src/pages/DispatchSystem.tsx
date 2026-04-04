@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Users, MapPin, Zap, AlertTriangle, 
-    ChevronRight, Radio, Send, Shield, Activity,
+    MapPin, Zap, AlertTriangle, 
+                ChevronRight, Radio, Send, Shield, Activity, Truck,
   CheckCircle, Clock, Filter, Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -12,23 +12,27 @@ import { toast } from "sonner";
 
 export default function DispatchSystem() {
   const [incidents, setIncidents] = useState<any[]>([]);
-  const [personnel, setPersonnel] = useState<any[]>([]);
     const [resources, setResources] = useState<any[]>([]);
+        const [aiPulse, setAiPulse] = useState<any | null>(null);
+        const [isApplyingPlan, setIsApplyingPlan] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
   const [isDispatching, setIsDispatching] = useState(false);
     const [incidentSearch, setIncidentSearch] = useState("");
-    const [personnelFilter, setPersonnelFilter] = useState<"All" | "Police" | "Fire" | "Medic">("All");
-    const [showPersonnelDrawer, setShowPersonnelDrawer] = useState(false);
+        const [resourceFilter, setResourceFilter] = useState<"All" | "Garbage" | "Water" | "Maintenance" | "Public Works">("All");
+        const [showResourceDrawer, setShowResourceDrawer] = useState(false);
+        const operationalResources = resources.filter((r) => {
+            const name = String(r.name || "").toLowerCase();
+            const type = String(r.type || "").toLowerCase();
+            return type === "public_works" || name.includes("garbage") || name.includes("water") || name.includes("maintenance") || name.includes("repair");
+        });
 
     const fetchData = async () => {
         try {
-            const [incRes, perRes, resourceRes] = await Promise.all([
+                        const [incRes, resourceRes] = await Promise.all([
                 api.get('/incidents'),
-                api.get('/dispatch/personnel'),
                 api.get('/resources')
             ]);
             setIncidents((incRes.data || []).filter((i: any) => i.status !== 'resolved'));
-            setPersonnel(perRes.data);
             setResources(resourceRes.data || []);
         } catch (err) {
             console.error("Dispatch fetch failed", err);
@@ -36,29 +40,37 @@ export default function DispatchSystem() {
         }
     };
 
+    const fetchAiPulse = async (silent = true) => {
+        try {
+            const { data } = await api.post('/dispatch/ai-analyze', {
+                liveInputs: {
+                    weather_rain_mm: 6,
+                    event_factor: 1.15,
+                    population_density_boost: 1.05,
+                },
+            });
+            setAiPulse(data);
+            if (!silent) {
+                toast.success('Live optimization updated');
+            }
+        } catch (err) {
+            if (!silent) {
+                toast.error('Unable to refresh live optimization');
+            }
+            console.error(err);
+        }
+    };
+
   useEffect(() => {
     fetchData();
+        fetchAiPulse(true);
     const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+        const pulseInterval = setInterval(() => fetchAiPulse(true), 15000);
+        return () => {
+            clearInterval(interval);
+            clearInterval(pulseInterval);
+        };
   }, []);
-
-  const handleDispatch = async (personnelId: string) => {
-    if (!selectedIncident) return;
-    setIsDispatching(true);
-    try {
-      await api.post('/dispatch/assign', {
-        incidentId: selectedIncident._id,
-        personnelId
-      });
-      toast.success("Personnel Dispatched Successfully");
-            fetchData();
-        } catch (err: any) {
-            toast.error(err?.response?.data?.message || "Dispatch Failed");
-      console.error(err);
-    } finally {
-      setIsDispatching(false);
-    }
-  };
 
     const handleAbortProtocol = async () => {
         if (!selectedIncident) {
@@ -68,25 +80,100 @@ export default function DispatchSystem() {
 
         const abortedTitle = selectedIncident.title;
         setSelectedIncident(null);
-        setShowPersonnelDrawer(false);
+        setShowResourceDrawer(false);
         setIsDispatching(false);
         await fetchData();
         toast.success(`Dispatch protocol aborted for: ${abortedTitle}`);
     };
 
-    const handleResourceDispatch = async (resourceId: string) => {
-        if (!selectedIncident) {
+    const handleResourceDispatch = async (resourceId: string, targetIncidentId?: string) => {
+        const incidentId = targetIncidentId || selectedIncident?._id;
+        if (!incidentId) {
             toast.error("Select an incident to dispatch a resource");
             return;
         }
 
         try {
-            await api.put(`/resources/${resourceId}/dispatch`, { incidentId: selectedIncident._id });
+            await api.put(`/resources/${resourceId}/dispatch`, { incidentId });
             toast.success("Resource dispatched to selected incident");
             fetchData();
         } catch (err) {
             toast.error("Resource dispatch failed");
             console.error(err);
+        }
+    };
+
+    const zoneIdForIncident = (incident: any) => {
+        const lat = Number(incident?.location?.lat);
+        const lng = Number(incident?.location?.lng);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return '';
+        return `${Math.round(lat * 10) / 10}_${Math.round(lng * 10) / 10}`;
+    };
+
+    const liveSuggestions = useMemo(() => {
+        if (!aiPulse?.allocationPlan?.length) return [];
+
+        const civicServiceTypes = new Set(['sanitation', 'water', 'roads', 'maintenance', 'utility', 'infrastructure', 'traffic']);
+        const unresolved = incidents.filter((i: any) => i.status !== 'resolved' && civicServiceTypes.has(String(i.type || '').toLowerCase()));
+        const incidentsByZone = unresolved.reduce((acc: Record<string, any[]>, incident: any) => {
+            const key = zoneIdForIncident(incident);
+            if (!key) return acc;
+            acc[key] = acc[key] || [];
+            acc[key].push(incident);
+            return acc;
+        }, {});
+
+        const resourceById = resources.reduce((acc: Record<string, any>, resource: any) => {
+            acc[String(resource._id)] = resource;
+            return acc;
+        }, {});
+
+        return aiPulse.allocationPlan
+            .map((allocation: any) => {
+                const resource = resourceById[String(allocation.resource_id)];
+                const inZone = incidentsByZone[String(allocation.zone_id)] || [];
+                const targetIncident = inZone.sort((a: any, b: any) => {
+                    const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+                    return (severityOrder[b?.severity] || 0) - (severityOrder[a?.severity] || 0);
+                })[0];
+
+                if (!resource || !targetIncident) return null;
+                return {
+                    resource,
+                    incident: targetIncident,
+                    eta: allocation.eta_minutes,
+                    predictedTravel: allocation.predicted_travel_time_minutes,
+                    routeFactors: allocation.route_factors,
+                    rankingScore: allocation.ranking_score,
+                    zone: allocation.zone_id,
+                    urgency: allocation.urgency_score,
+                    explainability: allocation.explainability,
+                    preferredFamily: allocation.preferred_family,
+                    resourceFamily: allocation.resource_family,
+                };
+            })
+            .filter(Boolean)
+            .slice(0, 6);
+    }, [aiPulse, incidents, resources]);
+
+    const applyLivePlan = async () => {
+        if (!liveSuggestions.length) {
+            toast.error('No live allocation suggestions available');
+            return;
+        }
+
+        setIsApplyingPlan(true);
+        try {
+            for (const suggestion of liveSuggestions.slice(0, 3)) {
+                await api.put(`/resources/${suggestion.resource._id}/dispatch`, { incidentId: suggestion.incident._id });
+            }
+            await Promise.all([fetchData(), fetchAiPulse(true)]);
+            toast.success('Live plan applied to top priority zones');
+        } catch (err) {
+            console.error(err);
+            toast.error('Failed to apply live plan');
+        } finally {
+            setIsApplyingPlan(false);
         }
     };
 
@@ -99,38 +186,41 @@ export default function DispatchSystem() {
         return title.includes(q) || type.includes(q) || address.includes(q);
     });
 
-    const filteredPersonnel = personnel.filter((p) => {
-        if (personnelFilter === "All") return true;
-        if (personnelFilter === "Police") return p.type === "police";
-        if (personnelFilter === "Fire") return p.type === "fire";
-        return p.type === "medical";
+    const filteredResources = operationalResources.filter((r) => {
+        if (resourceFilter === "All") return true;
+        const name = String(r.name || "").toLowerCase();
+        const type = String(r.type || "").toLowerCase();
+        if (resourceFilter === "Garbage") return name.includes("garbage") || name.includes("trash");
+        if (resourceFilter === "Water") return name.includes("water") || name.includes("tanker");
+        if (resourceFilter === "Maintenance") return name.includes("maintenance") || name.includes("repair");
+        return type === "public_works";
     });
 
-    const typeMatchedPersonnel = filteredPersonnel;
+    const typeMatchedResources = filteredResources;
 
     const formatCoord = (n?: number) => (typeof n === 'number' ? n.toFixed(4) : 'NA');
 
-    const personnelPanel = (
+    const resourcePanel = (
         <>
             <div className="p-8 border-b border-slate-800">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center gap-3">
-                        <Users className="w-4 h-4 text-primary" />
-                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-white">Personnel Matrix</span>
+                        <Truck className="w-4 h-4 text-primary" />
+                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-white">Resource Matrix</span>
                     </div>
                     <div className="px-3 py-1 bg-primary/10 rounded-full border border-primary/20">
-                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">{personnel.length} Units</span>
+                        <span className="text-[9px] font-black text-primary uppercase tracking-widest">{resources.length} Units</span>
                     </div>
                 </div>
 
                 <div className="flex gap-2">
-                    {['All', 'Police', 'Fire', 'Medic'].map(cat => (
+                    {['All', 'Garbage', 'Water', 'Maintenance', 'Public Works'].map(cat => (
                         <button
                             key={cat}
-                            onClick={() => setPersonnelFilter(cat as "All" | "Police" | "Fire" | "Medic")}
+                            onClick={() => setResourceFilter(cat as "All" | "Garbage" | "Water" | "Maintenance" | "Public Works")}
                             className={cn(
                                 "flex-1 py-3 items-center rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all",
-                                personnelFilter === cat ? "border-primary/40 text-white bg-primary/10" : "border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                                resourceFilter === cat ? "border-primary/40 text-white bg-primary/10" : "border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
                             )}
                         >
                             {cat}
@@ -140,25 +230,25 @@ export default function DispatchSystem() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-                {typeMatchedPersonnel.map((p) => (
+                {typeMatchedResources.map((r) => (
                     <div
-                        key={p._id}
+                        key={r._id}
                         className="group bg-slate-800/40 border border-slate-800 p-5 rounded-2xl hover:bg-slate-800 hover:border-slate-700 transition-all relative overflow-hidden"
                     >
                         <div className="flex items-center justify-between relative z-10">
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-700 flex items-center justify-center">
-                                    <Shield className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
+                                    <Truck className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
                                 </div>
                                 <div>
-                                    <h4 className="text-xs font-black text-white uppercase tracking-tight">{p.name}</h4>
-                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{p.contact?.unitId || 'UNIT'} • {p.type}</span>
+                                    <h4 className="text-xs font-black text-white uppercase tracking-tight">{r.name}</h4>
+                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{r.type?.replace('_', ' ') || 'resource'} • {r.status}</span>
                                 </div>
                             </div>
 
                             <button
                                 disabled={!selectedIncident || isDispatching}
-                                onClick={() => handleDispatch(p._id)}
+                                onClick={() => handleResourceDispatch(r._id)}
                                 className={cn(
                                     "px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
                                     selectedIncident
@@ -166,14 +256,14 @@ export default function DispatchSystem() {
                                         : "bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700"
                                 )}
                             >
-                                Assign
+                                Dispatch
                             </button>
                         </div>
                     </div>
                 ))}
-                {selectedIncident && typeMatchedPersonnel.length === 0 && (
+                {selectedIncident && typeMatchedResources.length === 0 && (
                     <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-200 text-xs font-bold uppercase tracking-wider">
-                        No available personnel right now.
+                        No available resources right now.
                     </div>
                 )}
             </div>
@@ -199,13 +289,13 @@ export default function DispatchSystem() {
       {/* ── LEFT: Incident Triage Cluster ──────────────────────────────────── */}
     <div className="w-full max-w-[480px] bg-white border-r border-border/40 flex flex-col shadow-2xl">
          <div className="p-8 border-b border-border/40 bg-white sticky top-0 z-10">
-            <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/20">
                     <Radio className="w-5 h-5 text-white animate-pulse" />
                 </div>
                 <div>
-                   <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Dispatch Relay</h2>
-                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Active Unassigned Matrix</p>
+                               <h2 className="text-2xl font-black uppercase tracking-tighter text-slate-900">Dispatch Relay</h2>
+                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">Active Resource Allocation Matrix</p>
                 </div>
             </div>
             
@@ -286,7 +376,7 @@ export default function DispatchSystem() {
       <div className="flex-1 flex flex-col min-w-0">
                  <div className="p-8 border-b border-border/40 bg-white">
                         <div className="h-[620px] rounded-3xl overflow-hidden border border-border/40">
-                            <CityMap incidents={[...incidents, ...(selectedIncident ? [selectedIncident] : [])]} resources={resources} />
+                            <CityMap incidents={[...incidents, ...(selectedIncident ? [selectedIncident] : [])]} resources={operationalResources} />
                         </div>
 
                         <AnimatePresence>
@@ -320,15 +410,82 @@ export default function DispatchSystem() {
 
                         <div className="mt-6 bg-white border border-border/40 rounded-2xl p-6 shadow-sm">
                             <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Seeded Route Preview</h3>
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{resources.length} units</span>
+                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Smart Allocation Suggestions</h3>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Auto every 15s</span>
+                                    <button
+                                        onClick={() => fetchAiPulse(false)}
+                                        className="px-3 py-2 rounded-lg border border-border/40 text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-primary hover:text-primary transition-all"
+                                    >
+                                        Refresh AI
+                                    </button>
+                                    <button
+                                        onClick={applyLivePlan}
+                                        disabled={isApplyingPlan || liveSuggestions.length === 0}
+                                        className="px-3 py-2 rounded-lg border border-primary/30 bg-primary/10 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all disabled:opacity-50"
+                                    >
+                                        {isApplyingPlan ? 'Applying...' : 'Apply Live Plan'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {liveSuggestions.length === 0 ? (
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No live recommendations yet. Run refresh to generate optimization.</p>
+                            ) : (
+                                <div className="space-y-2">
+                                    {liveSuggestions.map((s: any) => (
+                                        <div key={`${s.resource._id}-${s.incident._id}`} className="p-3 rounded-xl border border-border/30 bg-slate-50/50 flex items-center justify-between gap-4">
+                                            <div className="flex-1">
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">{s.resource.name}{' -> '}{s.incident.title}</p>
+                                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Zone {s.zone} • Route ETA {s.predictedTravel || s.eta}m • Urgency {Number(s.urgency || 0).toFixed(1)}</p>
+                                                <div className="mt-2 flex flex-wrap gap-2">
+                                                    <span className="px-2 py-1 rounded-md bg-white border border-border/40 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                                        Explainability Score {s.explainability?.score ?? '--'}
+                                                    </span>
+                                                    <span className="px-2 py-1 rounded-md bg-white border border-border/40 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                                        Rank {s.rankingScore ?? '--'}
+                                                    </span>
+                                                    <span className="px-2 py-1 rounded-md bg-white border border-border/40 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                                        Need {s.preferredFamily || 'general'}
+                                                    </span>
+                                                    <span className="px-2 py-1 rounded-md bg-white border border-border/40 text-[8px] font-black uppercase tracking-widest text-slate-500">
+                                                        Unit {s.resourceFamily || 'general'}
+                                                    </span>
+                                                </div>
+                                                {Array.isArray(s.explainability?.why) && s.explainability.why.length > 0 && (
+                                                    <p className="mt-2 text-[9px] font-bold text-slate-600 uppercase tracking-wide">
+                                                        {s.explainability.why[0]}
+                                                    </p>
+                                                )}
+                                                {s.routeFactors && (
+                                                    <p className="mt-1 text-[9px] font-bold text-slate-500 uppercase tracking-wide">
+                                                        Traffic x{Number(s.routeFactors.trafficIndex || 1).toFixed(2)} • Road x{Number(s.routeFactors.roadConditionIndex || 1).toFixed(2)}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <button
+                                                onClick={() => handleResourceDispatch(s.resource._id, s.incident._id)}
+                                                className="px-3 py-2 rounded-lg border border-border/40 text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-primary hover:text-primary transition-all"
+                                            >
+                                                Apply
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="mt-6 bg-white border border-border/40 rounded-2xl p-6 shadow-sm">
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Seeded Resource Preview</h3>
+                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{operationalResources.length} units</span>
                             </div>
 
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[760px] text-left">
                                     <thead>
                                         <tr className="border-b border-border/40">
-                                            <th className="py-3 pr-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Unit</th>
+                                            <th className="py-3 pr-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Resource</th>
                                             <th className="py-3 pr-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Type</th>
                                             <th className="py-3 pr-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Current Position</th>
                                             <th className="py-3 pr-4 text-[9px] font-black uppercase tracking-widest text-slate-400">Destination</th>
@@ -337,7 +494,7 @@ export default function DispatchSystem() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {resources.map((r: any) => (
+                                        {operationalResources.map((r: any) => (
                                             <tr key={r._id} className="border-b border-border/20">
                                                 <td className="py-3 pr-4 text-[11px] font-black uppercase tracking-wide text-slate-900">{r.name}</td>
                                                 <td className="py-3 pr-4 text-[10px] font-black uppercase tracking-widest text-slate-500">{r.type.replace('_', ' ')}</td>
@@ -377,22 +534,22 @@ export default function DispatchSystem() {
       </div>
 
             {/* Right-edge arrow toggle */}
-            <button
-                onClick={() => setShowPersonnelDrawer((v) => !v)}
+                <button
+                onClick={() => setShowResourceDrawer((v) => !v)}
                 className="fixed right-0 top-1/2 -translate-y-1/2 z-[1210] w-10 h-16 rounded-l-xl bg-slate-900 text-white text-xl font-black shadow-2xl border border-slate-700 border-r-0"
-                aria-label={showPersonnelDrawer ? "Close personnel matrix" : "Open personnel matrix"}
+                aria-label={showResourceDrawer ? "Close resource matrix" : "Open resource matrix"}
             >
-                {showPersonnelDrawer ? ">" : "<"}
+                {showResourceDrawer ? ">" : "<"}
             </button>
 
             <AnimatePresence>
-                {showPersonnelDrawer && (
+                {showResourceDrawer && (
                     <>
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
-                            onClick={() => setShowPersonnelDrawer(false)}
+                            onClick={() => setShowResourceDrawer(false)}
                             className="fixed inset-0 bg-black/40 z-[1190]"
                         />
                         <motion.div
@@ -403,15 +560,15 @@ export default function DispatchSystem() {
                             className="fixed top-0 right-0 h-full w-[min(92vw,420px)] bg-slate-900 border-l border-slate-800 z-[1200] flex flex-col shadow-2xl"
                         >
                             <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Personnel Matrix</span>
+                                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Resource Matrix</span>
                                 <button
-                                    onClick={() => setShowPersonnelDrawer(false)}
+                                    onClick={() => setShowResourceDrawer(false)}
                                     className="px-3 py-2 rounded-lg border border-slate-700 text-[9px] font-black uppercase tracking-widest text-slate-300"
                                 >
                                     Close
                                 </button>
                             </div>
-                            {personnelPanel}
+                            {resourcePanel}
                         </motion.div>
                     </>
                 )}

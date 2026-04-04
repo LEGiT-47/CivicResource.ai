@@ -1,4 +1,5 @@
 import Resource from '../models/Resource.js';
+import Incident from '../models/Incident.js';
 
 // @desc    Create a new resource
 // @route   POST /api/resources
@@ -73,11 +74,36 @@ export const dispatchResource = async (req, res, next) => {
   try {
     const { incidentId } = req.body;
     const resource = await Resource.findById(req.params.id);
+    const incident = await Incident.findById(incidentId);
+
+    if (!incident) {
+      res.status(404);
+      throw new Error('Incident not found');
+    }
 
     if (resource) {
+      const previousIncidentId = resource.currentIncident ? String(resource.currentIncident) : null;
+
+      if (previousIncidentId && previousIncidentId !== String(incidentId)) {
+        await Incident.findByIdAndUpdate(previousIncidentId, {
+          $pull: { assignedResources: resource._id },
+        });
+      }
+
       resource.status = 'dispatched';
       resource.currentIncident = incidentId;
       const updatedResource = await resource.save();
+
+      incident.dispatchStatus = 'dispatched';
+      if (incident.status === 'resolved') {
+        incident.status = 'active';
+      }
+      incident.assignedResources = incident.assignedResources || [];
+      if (!incident.assignedResources.map((id) => String(id)).includes(String(resource._id))) {
+        incident.assignedResources.push(resource._id);
+      }
+      await incident.save();
+
       res.json(updatedResource);
     } else {
       res.status(404);

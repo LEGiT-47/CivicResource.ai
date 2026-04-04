@@ -14,7 +14,7 @@ export const normalizeRole = (role?: string | null): AppRole | null => {
 
 export const getStoredUser = (): StoredUser | null => {
   try {
-    const rawUser = localStorage.getItem("CivicFlow_user");
+    const rawUser = localStorage.getItem("CivicResource_user") || localStorage.getItem("CivicFlow_user");
     if (!rawUser) return null;
     return JSON.parse(rawUser) as StoredUser;
   } catch {

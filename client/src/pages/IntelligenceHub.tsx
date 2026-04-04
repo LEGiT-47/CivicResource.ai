@@ -196,7 +196,7 @@ export default function IntelligenceHub() {
             </div>
             <h1 className="text-4xl font-black uppercase tracking-tighter text-slate-900">Intelligence Matrix</h1>
           </div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-[56px]">Predictive Urban Triage & Resource Logic</p>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] ml-[56px]">Predictive, Real-Time Resource Optimization</p>
         </div>
         
         <div className="flex items-center gap-4 bg-white p-2 rounded-2xl border border-border/40 shadow-sm">
@@ -280,7 +280,7 @@ export default function IntelligenceHub() {
                     optimizedView ? "bg-primary text-white shadow-xl shadow-primary/30" : "text-slate-400 hover:text-slate-600"
                   )}
                 >
-                  Induct Optimization
+                  Live Optimization
                 </button>
             </div>
           </div>
@@ -316,7 +316,7 @@ export default function IntelligenceHub() {
           <div className="flex items-center justify-between mb-12">
             <div>
                 <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 leading-none">Operational Load Matrix</h3>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3">Predictive Sector Demand Distribution</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3">Predictive Demand Distribution</p>
             </div>
             <div className="flex items-center gap-8">
                {[
@@ -368,7 +368,7 @@ export default function IntelligenceHub() {
         <div className="plinth-card p-8 bg-white flex flex-col min-h-[560px] overflow-hidden">
             <div className="mb-10">
                 <h3 className="text-2xl font-black uppercase tracking-tight text-slate-900 leading-none">Sector Triage</h3>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3">Active Municipal Resource Flow</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-3">Live Resource Flow</p>
                 <div className="flex flex-wrap gap-2 mt-5">
                   <button
                     onClick={() => setSelectedCategory("all")}

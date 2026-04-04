@@ -16,7 +16,7 @@ app.use(express.json());
 
 // Basic Route
 app.get('/', (req, res) => {
-  res.send('CivicFlow API is running...');
+  res.send('CivicResource.ai API is running...');
 });
 
 import authRoutes from './routes/authRoutes.js';

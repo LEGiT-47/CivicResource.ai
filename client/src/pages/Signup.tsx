@@ -33,13 +33,13 @@ export default function Signup() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-        organization: "CivicFlow Registry",
+      organization: "CivicResource.ai Registry",
         role: backendRole
       };
 
       const { data } = await api.post("/auth/register", payload);
-      localStorage.setItem("CivicFlow_token", data.token);
-      localStorage.setItem("CivicFlow_user", JSON.stringify({
+      localStorage.setItem("CivicResource_token", data.token);
+      localStorage.setItem("CivicResource_user", JSON.stringify({
         _id: data._id,
         name: data.name,
         email: data.email,
@@ -66,7 +66,7 @@ export default function Signup() {
         <div className="max-w-md w-full mx-auto flex-1 flex flex-col justify-center">
             <div className="flex items-center gap-4 mb-12 shrink-0">
                <BrandMark className="w-12 h-12 shadow-2xl" letterClassName="text-2xl" />
-               <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicFlow</span>
+               <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicResource.ai</span>
             </div>
 
             <h1 className="text-6xl font-black uppercase tracking-tighter text-slate-900 mb-4 leading-none italic">Staff <span className="text-primary not-italic">Induction</span></h1>
@@ -175,7 +175,7 @@ export default function Signup() {
            <div className="w-20 h-1 bg-primary mb-12 rounded-full shadow-[0_0_20px_rgba(255,79,0,0.8)]" />
            <h2 className="text-6xl font-black uppercase tracking-tighter text-white mb-8 leading-none italic">Resilient <br /> <span className="text-primary not-italic">Governance</span></h2>
            <p className="text-xs font-black text-white/40 uppercase tracking-[0.3em] leading-relaxed mb-16">
-              Join the official CivicFlow node to orchestrate and optimize district-scale municipal protocols.
+              Join the official CivicResource.ai node to orchestrate and optimize district-scale municipal protocols.
            </p>
            
            <div className="grid grid-cols-2 gap-8">

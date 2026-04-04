@@ -36,7 +36,7 @@ export default function NotFound() {
         <div className="mt-20 pt-10 border-t border-slate-50 flex items-center justify-center gap-8 opacity-30">
            <div className="flex items-center gap-4">
               <Zap className="w-4 h-4 text-primary" />
-              <span className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-900">CivicFlow Diagnostic Mode</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.5em] text-slate-900">CivicResource.ai Diagnostic Mode</span>
            </div>
         </div>
       </motion.div>

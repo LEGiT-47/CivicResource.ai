@@ -12,18 +12,21 @@ import { toast } from "sonner";
 export default function ReportsArchive() {
   const [reports, setReports] = useState<any[]>([]);
     const [personnel, setPersonnel] = useState<any[]>([]);
+        const [resources, setResources] = useState<any[]>([]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [selectedReport, setSelectedReport] = useState<any | null>(null);
 
     const syncArchiveData = async () => {
         try {
-            const [reportsRes, personnelRes] = await Promise.all([
+            const [reportsRes, personnelRes, resourcesRes] = await Promise.all([
                 api.get('/incidents?status=all'),
-                api.get('/dispatch/personnel?all=true')
+                api.get('/dispatch/personnel?all=true'),
+                api.get('/resources')
             ]);
             setReports(reportsRes.data);
             setPersonnel(personnelRes.data || []);
+            setResources(resourcesRes.data || []);
         } catch (err) {
             console.error("Reports fetch failed", err);
             toast.error("Unable to sync archive records");
@@ -52,6 +55,19 @@ export default function ReportsArchive() {
         const resolvedNames = ids.map((id: string) => {
             const person = personnel.find((p: any) => p._id === id);
             return person?.name || id;
+        });
+
+        return Array.from(new Set(resolvedNames)).join(", ");
+    };
+
+    const getAssignedResourceNames = (report: any) => {
+        const rawAssigned = Array.isArray(report.assignedResources) ? report.assignedResources : [];
+        if (!rawAssigned.length) return "Not assigned";
+
+        const ids = rawAssigned.map((r: any) => (typeof r === "string" ? r : r?._id)).filter(Boolean);
+        const resolvedNames = ids.map((id: string) => {
+            const resource = resources.find((r: any) => r._id === id);
+            return resource?.name || id;
         });
 
         return Array.from(new Set(resolvedNames)).join(", ");
@@ -217,6 +233,9 @@ export default function ReportsArchive() {
                             <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-900">Assignment Summary</h3>
                             <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
                                 Assigned: {getAssignedDisplayNames(selectedReport)}
+                            </p>
+                            <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
+                                Assigned Resources: {getAssignedResourceNames(selectedReport)}
                             </p>
                             <p className="text-[11px] font-black uppercase tracking-widest text-slate-600">
                                 Completed: {selectedReport.status === 'resolved' ? 'Yes' : 'No'}

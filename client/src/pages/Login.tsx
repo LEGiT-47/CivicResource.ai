@@ -25,8 +25,8 @@ export default function Login() {
     try {
       const { data } = await api.post("/auth/login", { email, password });
       const normalizedRole = normalizeRole(data.role) || "worker";
-      localStorage.setItem("CivicFlow_token", data.token);
-         localStorage.setItem("CivicFlow_user", JSON.stringify({
+      localStorage.setItem("CivicResource_token", data.token);
+         localStorage.setItem("CivicResource_user", JSON.stringify({
             _id: data._id,
             name: data.name,
             email: data.email,
@@ -53,7 +53,7 @@ export default function Login() {
         <div className="max-w-md w-full mx-auto flex-1 flex flex-col justify-center">
             <div className="flex items-center gap-4 mb-12">
                <BrandMark className="w-12 h-12 shadow-2xl" letterClassName="text-2xl" />
-               <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicFlow</span>
+               <span className="text-3xl font-black uppercase tracking-tighter text-slate-900 leading-none">CivicResource.ai</span>
             </div>
 
             <h1 className="text-6xl font-black uppercase tracking-tighter text-slate-900 mb-4 leading-none italic">Staff <span className="text-primary not-italic">Login</span></h1>

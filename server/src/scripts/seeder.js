@@ -82,6 +82,20 @@ const seedData = async () => {
       { name: 'Worker 10 - Water Supply Technician', email: 'worker10@civicflow.ai', password: 'worker10', role: 'responder', organization: 'Mumbai Water Supply', unitId: 'WAT-001' }
     ]);
 
+    // Additional civic-service responders for denser hackathon demo volume
+    const additionalWorkerUsers = await User.create([
+      { name: 'Worker 11 - Sanitation Route Lead', email: 'worker11@civicflow.ai', password: 'worker11', role: 'responder', organization: 'Mumbai Sanitation Department', unitId: 'SAN-002' },
+      { name: 'Worker 12 - Sanitation Operations', email: 'worker12@civicflow.ai', password: 'worker12', role: 'responder', organization: 'Mumbai Sanitation Department', unitId: 'SAN-003' },
+      { name: 'Worker 13 - Water Supply Lead', email: 'worker13@civicflow.ai', password: 'worker13', role: 'responder', organization: 'Mumbai Water Supply', unitId: 'WAT-002' },
+      { name: 'Worker 14 - Water Supply Crew', email: 'worker14@civicflow.ai', password: 'worker14', role: 'responder', organization: 'Mumbai Water Supply', unitId: 'WAT-003' },
+      { name: 'Worker 15 - Roads Maintenance Lead', email: 'worker15@civicflow.ai', password: 'worker15', role: 'responder', organization: 'Mumbai Public Works', unitId: 'UTL-003' },
+      { name: 'Worker 16 - Roads Maintenance Crew', email: 'worker16@civicflow.ai', password: 'worker16', role: 'responder', organization: 'Mumbai Public Works', unitId: 'UTL-004' },
+      { name: 'Worker 17 - Utility Grid Field Unit', email: 'worker17@civicflow.ai', password: 'worker17', role: 'responder', organization: 'Mumbai Electricity Board', unitId: 'UTL-005' },
+      { name: 'Worker 18 - Utility Grid Supervisor', email: 'worker18@civicflow.ai', password: 'worker18', role: 'responder', organization: 'Mumbai Electricity Board', unitId: 'UTL-006' },
+      { name: 'Worker 19 - Flood Response Unit', email: 'worker19@civicflow.ai', password: 'worker19', role: 'responder', organization: 'Mumbai Disaster Response', unitId: 'WAT-004' },
+      { name: 'Worker 20 - Drainage Repair Unit', email: 'worker20@civicflow.ai', password: 'worker20', role: 'responder', organization: 'Mumbai Public Works', unitId: 'UTL-007' }
+    ]);
+
     const incidents = await Incident.create([
       // Police incidents (assign to POL-001, POL-002)
       {
@@ -191,7 +205,7 @@ const seedData = async () => {
       }
     ]);
 
-    await Resource.create([
+    const baseResources = await Resource.create([
       { name: 'Water Tanker WT-17', type: 'public_works', status: 'dispatched', location: { lat: 19.05, lng: 72.86 }, currentIncident: incidents[0]._id, batteryOrFuelLevel: 78 },
       { name: 'Garbage Truck GT-22', type: 'public_works', status: 'dispatched', location: { lat: 19.11, lng: 72.87 }, currentIncident: incidents[1]._id, batteryOrFuelLevel: 70 },
       { name: 'Fire Tender FT-04', type: 'fire', status: 'dispatched', location: { lat: 19.08, lng: 72.88 }, currentIncident: incidents[5]._id, batteryOrFuelLevel: 82 },
@@ -200,6 +214,19 @@ const seedData = async () => {
       { name: 'Ambulance AMB-09', type: 'medical', status: 'dispatched', location: { lat: 19.02, lng: 72.85 }, currentIncident: incidents[8]._id, batteryOrFuelLevel: 76 },
       { name: 'Road Repair Unit RR-31', type: 'public_works', status: 'maintenance', location: { lat: 19.09, lng: 72.89 }, batteryOrFuelLevel: 68 },
       { name: 'Public Works Van PW-08', type: 'public_works', status: 'patrol', location: { lat: 19.13, lng: 72.84 }, batteryOrFuelLevel: 88 }
+    ]);
+
+    const extraResources = await Resource.create([
+      { name: 'Garbage Truck GT-31', type: 'public_works', status: 'patrol', location: { lat: 19.08, lng: 72.83 }, batteryOrFuelLevel: 86 },
+      { name: 'Garbage Truck GT-32', type: 'public_works', status: 'patrol', location: { lat: 19.14, lng: 72.88 }, batteryOrFuelLevel: 79 },
+      { name: 'Water Tanker WT-21', type: 'public_works', status: 'patrol', location: { lat: 19.03, lng: 72.89 }, batteryOrFuelLevel: 83 },
+      { name: 'Water Tanker WT-22', type: 'public_works', status: 'maintenance', location: { lat: 19.16, lng: 72.91 }, batteryOrFuelLevel: 67 },
+      { name: 'Maintenance Unit MU-12', type: 'public_works', status: 'patrol', location: { lat: 19.06, lng: 72.93 }, batteryOrFuelLevel: 88 },
+      { name: 'Maintenance Unit MU-13', type: 'public_works', status: 'patrol', location: { lat: 19.1, lng: 72.82 }, batteryOrFuelLevel: 90 },
+      { name: 'Drainage Repair DR-05', type: 'public_works', status: 'patrol', location: { lat: 19.04, lng: 72.84 }, batteryOrFuelLevel: 84 },
+      { name: 'Drainage Repair DR-06', type: 'public_works', status: 'patrol', location: { lat: 19.17, lng: 72.86 }, batteryOrFuelLevel: 76 },
+      { name: 'Road Service RS-41', type: 'public_works', status: 'patrol', location: { lat: 19.09, lng: 72.9 }, batteryOrFuelLevel: 81 },
+      { name: 'Road Service RS-42', type: 'public_works', status: 'patrol', location: { lat: 19.12, lng: 72.85 }, batteryOrFuelLevel: 78 }
     ]);
 
     const personnel = await Personnel.create([
@@ -219,6 +246,34 @@ const seedData = async () => {
       { name: 'Worker 9 - Sanitation Supervisor', type: 'sanitation', status: 'available', location: { lat: 19.07, lng: 72.82 }, contact: { phone: '+91-9000000009', unitId: 'SAN-001' } },
       // Water/Sewage Worker (1)
       { name: 'Worker 10 - Water Supply Technician', type: 'utility', status: 'available', location: { lat: 19.09, lng: 72.91 }, contact: { phone: '+91-9000000010', unitId: 'WAT-001' } }
+    ]);
+
+    const extraPersonnel = await Personnel.create([
+      { name: 'Worker 11 - Sanitation Route Lead', type: 'sanitation', status: 'available', location: { lat: 19.1, lng: 72.86 }, contact: { phone: '+91-9000000011', unitId: 'SAN-002' } },
+      { name: 'Worker 12 - Sanitation Operations', type: 'sanitation', status: 'available', location: { lat: 19.13, lng: 72.89 }, contact: { phone: '+91-9000000012', unitId: 'SAN-003' } },
+      { name: 'Worker 13 - Water Supply Lead', type: 'utility', status: 'available', location: { lat: 19.06, lng: 72.88 }, contact: { phone: '+91-9000000013', unitId: 'WAT-002' } },
+      { name: 'Worker 14 - Water Supply Crew', type: 'utility', status: 'available', location: { lat: 19.15, lng: 72.9 }, contact: { phone: '+91-9000000014', unitId: 'WAT-003' } },
+      { name: 'Worker 15 - Roads Maintenance Lead', type: 'utility', status: 'available', location: { lat: 19.08, lng: 72.94 }, contact: { phone: '+91-9000000015', unitId: 'UTL-003' } },
+      { name: 'Worker 16 - Roads Maintenance Crew', type: 'utility', status: 'available', location: { lat: 19.11, lng: 72.87 }, contact: { phone: '+91-9000000016', unitId: 'UTL-004' } },
+      { name: 'Worker 17 - Utility Grid Field Unit', type: 'utility', status: 'available', location: { lat: 19.02, lng: 72.9 }, contact: { phone: '+91-9000000017', unitId: 'UTL-005' } },
+      { name: 'Worker 18 - Utility Grid Supervisor', type: 'utility', status: 'available', location: { lat: 19.17, lng: 72.83 }, contact: { phone: '+91-9000000018', unitId: 'UTL-006' } },
+      { name: 'Worker 19 - Flood Response Unit', type: 'utility', status: 'available', location: { lat: 19.07, lng: 72.95 }, contact: { phone: '+91-9000000019', unitId: 'WAT-004' } },
+      { name: 'Worker 20 - Drainage Repair Unit', type: 'utility', status: 'available', location: { lat: 19.04, lng: 72.9 }, contact: { phone: '+91-9000000020', unitId: 'UTL-007' } }
+    ]);
+
+    const extraIncidents = await Incident.create([
+      { title: 'Overflowing community bins near Kurla East market', type: 'sanitation', severity: 'high', location: { lat: 19.064, lng: 72.888, address: 'Kurla East Market, Mumbai' }, aiPredictionConfidence: 89 },
+      { title: 'Garbage backlog after weekend event in Bandra', type: 'sanitation', severity: 'medium', location: { lat: 19.061, lng: 72.834, address: 'Bandra Reclamation, Mumbai' }, aiPredictionConfidence: 82 },
+      { title: 'Delayed water tanker supply in Govandi blocks', type: 'water', severity: 'critical', location: { lat: 19.055, lng: 72.923, address: 'Govandi Block C, Mumbai' }, aiPredictionConfidence: 93 },
+      { title: 'Low water pressure complaints in Chembur colony', type: 'water', severity: 'high', location: { lat: 19.052, lng: 72.901, address: 'Chembur Colony, Mumbai' }, aiPredictionConfidence: 88 },
+      { title: 'Road patch failure near Andheri subway', type: 'roads', severity: 'high', location: { lat: 19.118, lng: 72.846, address: 'Andheri Subway, Mumbai' }, aiPredictionConfidence: 86 },
+      { title: 'Pothole spread expanding near Sakinaka junction', type: 'roads', severity: 'critical', location: { lat: 19.102, lng: 72.887, address: 'Sakinaka Junction, Mumbai' }, aiPredictionConfidence: 94 },
+      { title: 'Drainage desilting required in Mahim lowlands', type: 'maintenance', severity: 'high', location: { lat: 19.041, lng: 72.84, address: 'Mahim Lowlands, Mumbai' }, aiPredictionConfidence: 84 },
+      { title: 'Broken manhole cover near Byculla bridge', type: 'maintenance', severity: 'critical', location: { lat: 18.977, lng: 72.832, address: 'Byculla Bridge, Mumbai' }, aiPredictionConfidence: 92 },
+      { title: 'Streetlight blackout corridor in Jogeshwari East', type: 'utility', severity: 'medium', location: { lat: 19.132, lng: 72.857, address: 'Jogeshwari East, Mumbai' }, aiPredictionConfidence: 79 },
+      { title: 'Transformer overload alerts in Ghatkopar West', type: 'utility', severity: 'high', location: { lat: 19.09, lng: 72.89, address: 'Ghatkopar West, Mumbai' }, aiPredictionConfidence: 87 },
+      { title: 'Traffic diversions causing service delays near Dharavi', type: 'traffic', severity: 'medium', location: { lat: 19.045, lng: 72.86, address: 'Dharavi Main Road, Mumbai' }, aiPredictionConfidence: 76 },
+      { title: 'Roadside debris obstructing tanker routes', type: 'infrastructure', severity: 'high', location: { lat: 19.02, lng: 72.872, address: 'Lower Parel Connector, Mumbai' }, aiPredictionConfidence: 83 }
     ]);
 
     // Assign at least one incident to every worker with mixed states
@@ -304,14 +359,17 @@ const seedData = async () => {
       ...personnel.map(p => p.save())
     ]);
 
+    const totalIncidentCount = incidents.length + extraIncidents.length;
+    const totalResources = baseResources.length + extraResources.length;
+
     await Analytics.create([
       {
         organization: 'Mumbai Command',
-        activeIncidentsCount: incidents.length,
-        unitsDeployed: 8,
+        activeIncidentsCount: totalIncidentCount,
+        unitsDeployed: totalResources,
         avgResponseTimeMinutes: 8.6,
         slaCompliancePercent: 93,
-        aiPredictionsCount: 3480,
+        aiPredictionsCount: totalIncidentCount * 240,
         systemHealthPercent: 99.8,
         demandTimeSeries: [
           { time: '00:00', actual: 32, predicted: 35, optimized: 29 },
@@ -346,6 +404,11 @@ const seedData = async () => {
         ]
       }
     ]);
+
+    console.log(`Seeded users: ${createdUsers.length + workerUsers.length + additionalWorkerUsers.length}`);
+    console.log(`Seeded personnel: ${personnel.length + extraPersonnel.length}`);
+    console.log(`Seeded incidents: ${totalIncidentCount}`);
+    console.log(`Seeded resources: ${totalResources}`);
 
     console.log('✅ Data Seeded Successfully');
     process.exit();
