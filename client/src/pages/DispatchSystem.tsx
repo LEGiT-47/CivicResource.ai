@@ -10,6 +10,21 @@ import CityMap from "@/components/CityMap";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
+const formatRelativeTime = (value?: string | Date) => {
+    const timestamp = value ? new Date(value).getTime() : NaN;
+    if (!Number.isFinite(timestamp)) return "just now";
+
+    const diffMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+    if (diffMinutes < 1) return "just now";
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+    const hours = Math.floor(diffMinutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+};
+
 export default function DispatchSystem() {
   const [incidents, setIncidents] = useState<any[]>([]);
     const [resources, setResources] = useState<any[]>([]);
@@ -804,7 +819,7 @@ export default function DispatchSystem() {
                                 <MapPin className="w-3 h-3" /> {inc.location.address?.split(',')[0] || "Unknown Vector"}
                             </div>
                             <div className="flex items-center gap-2">
-                                <Clock className="w-3 h-3" /> 2m ago
+                                <Clock className="w-3 h-3" /> {formatRelativeTime(inc.createdAt)}
                             </div>
                         </div>
                     </motion.div>

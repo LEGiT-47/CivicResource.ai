@@ -162,6 +162,26 @@ const textSimilarity = (a = '', b = '') => {
   return union ? intersection / union : 0;
 };
 
+const looksLikePlaceholderComplaint = ({ title = '', details = '', type = '', address = '' }) => {
+  const text = `${title} ${details} ${type} ${address}`.toLowerCase();
+  const tokens = tokenize(text);
+  const civicTerms = [
+    'water', 'garbage', 'trash', 'waste', 'sanitation', 'litter', 'dump',
+    'road', 'pothole', 'drain', 'sewer', 'electric', 'power', 'traffic',
+    'fire', 'crime', 'safety', 'medical', 'utility', 'infrastructure', 'leak', 'pipe', 'shortage'
+  ];
+  const repeatedTokenRatio = tokens.length ? (tokens.length - new Set(tokens).size) / tokens.length : 1;
+  const civicHits = civicTerms.filter((term) => text.includes(term)).length;
+  const tooShort = text.replace(/\s+/g, ' ').trim().length < 30;
+  const placeholderPattern = /\b(test|spam|dummy|fake|ignore|asdf|lorem|hello world|sample data)\b/;
+
+  return (
+    placeholderPattern.test(text) ||
+    (tokens.length > 0 && repeatedTokenRatio >= 0.5 && civicHits === 0) ||
+    (civicHits === 0 && tooShort)
+  );
+};
+
 const nextSeverity = (current = 'medium') => {
   const order = ['low', 'medium', 'high', 'critical'];
   const idx = Math.max(0, order.indexOf(current));
@@ -419,6 +439,13 @@ export const createIncident = async (req, res, next) => {
     };
     const hasLocation = typeof locationWithCoords.lat === 'number' && typeof locationWithCoords.lng === 'number';
 
+    const localPlaceholderComplaint = looksLikePlaceholderComplaint({
+      title: title || '',
+      details: detailsText,
+      type: normalizedType,
+      address: locationWithCoords.address || '',
+    });
+
     const aiTriage = (await analyzeComplaintIntake({
       title: title || '',
       details: detailsText,
@@ -447,7 +474,7 @@ export const createIncident = async (req, res, next) => {
 
     const aiPredictedType = normalizeType(aiTriage.predicted_type || aiTriage.resource_family || normalizedType);
     const triagedType = normalizedType !== 'general' ? normalizedType : aiPredictedType;
-    const shouldRejectComplaint = Boolean(isPublicSubmission && aiTriage.is_fake);
+    const shouldRejectComplaint = Boolean(isPublicSubmission && (aiTriage.is_fake || localPlaceholderComplaint));
 
     if (shouldRejectComplaint) {
       res.status(422);

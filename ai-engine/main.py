@@ -261,6 +261,8 @@ def heuristic_fake_score(title: str, details: str, reported_type: str, location_
     unique_ratio = len(set(tokens)) / max(1, token_count)
     strongest_label, hit_counts = civic_keyword_hits(text)
     reported_family = normalize_need_label(reported_type)
+    placeholder_pattern = re.search(r"\b(test|spam|dummy|fake|ignore|asdf|lorem|hello world|sample data)\b", text.lower())
+    repeated_token_ratio = (token_count - len(set(tokens))) / max(1, token_count)
 
     score = 0.0
     if token_count < 6:
@@ -271,13 +273,15 @@ def heuristic_fake_score(title: str, details: str, reported_type: str, location_
         score += 0.25
     if unique_ratio < 0.45:
         score += 0.15
+    if repeated_token_ratio >= 0.5 and strongest_label == "general":
+        score += 0.3
     if not location_present:
         score += 0.15
     if not reporter_phone_present:
         score += 0.08
     if reported_family != "general" and hit_counts.get(reported_family, 0) == 0 and strongest_label != reported_family:
         score += 0.1
-    if re.search(r"\b(test|spam|dummy|fake|ignore|asdf|lorem|hello world)\b", text.lower()):
+    if placeholder_pattern:
         score += 0.45
 
     return min(1.0, score)
@@ -425,6 +429,14 @@ def analyze_complaint_intake(payload: ComplaintTriageRequest):
 
     if strongest_label != "general" and predicted_intent != strongest_label:
         fake_probability = min(1.0, fake_probability + 0.08)
+
+    if token_count := len(re.findall(r"[a-zA-Z0-9]+", combined_text.lower())):
+        unique_ratio = len(set(re.findall(r"[a-zA-Z0-9]+", combined_text.lower()))) / max(1, token_count)
+        repeated_token_ratio = (token_count - len(set(re.findall(r"[a-zA-Z0-9]+", combined_text.lower())))) / max(1, token_count)
+        if repeated_token_ratio >= 0.5 and strongest_label == "general":
+            fake_probability = max(fake_probability, 0.8)
+        if unique_ratio < 0.4 and strongest_label == "general":
+            fake_probability = max(fake_probability, 0.75)
 
     fake_probability = min(1.0, max(0.0, fake_probability))
     confidence = round((1.0 - fake_probability) * 100, 1)
