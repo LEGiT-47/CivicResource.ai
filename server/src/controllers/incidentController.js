@@ -477,8 +477,14 @@ export const createIncident = async (req, res, next) => {
     const shouldRejectComplaint = Boolean(isPublicSubmission && (aiTriage.is_fake || localPlaceholderComplaint));
 
     if (shouldRejectComplaint) {
+      const rawReason = String(aiTriage?.reason || '').trim();
+      const rejectReason = localPlaceholderComplaint
+        ? 'Complaint rejected: please enter a real civic issue with meaningful details.'
+        : rawReason && !/accepted/i.test(rawReason)
+          ? rawReason
+          : 'Complaint rejected by AI triage as likely fake or non-civic.';
       res.status(422);
-      throw new Error(aiTriage.reason || 'Complaint rejected by AI triage as likely fake or non-civic');
+      throw new Error(rejectReason);
     }
 
     const [titleNlp, detailsNlp] = await Promise.all([
