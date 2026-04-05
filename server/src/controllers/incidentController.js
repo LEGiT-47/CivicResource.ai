@@ -665,39 +665,54 @@ export const updateIncidentStatus = async (req, res, next) => {
         ].map((id) => String(id));
 
         const uniquePersonnelIds = [...new Set(personnelIds)].filter(Boolean);
+        const resolvedIncidentId = String(incident._id);
 
         if (uniquePersonnelIds.length > 0) {
           for (const personnelId of uniquePersonnelIds) {
             const personnel = await Personnel.findById(personnelId);
             if (personnel) {
-              if (personnel.taskQueue && personnel.taskQueue.length > 0) {
-                // Pop from queue and assign as current
-                const nextIncidentId = personnel.taskQueue.shift();
+              const sanitizedQueue = (personnel.taskQueue || [])
+                .map((id) => String(id))
+                .filter((id) => id && id !== resolvedIncidentId);
+              const isResolvingCurrent = String(personnel.currentIncident || '') === resolvedIncidentId;
+
+              if (isResolvingCurrent && sanitizedQueue.length > 0) {
+                const nextIncidentId = sanitizedQueue.shift();
                 personnel.currentIncident = nextIncidentId;
-                personnel.status = 'busy'; // Remains busy
+                personnel.taskQueue = sanitizedQueue;
+                personnel.status = 'busy';
                 await personnel.save();
 
-                // Update the next incident to be dispatched
                 const nextIncident = await Incident.findById(nextIncidentId);
                 if (nextIncident) {
                   nextIncident.assignedPersonnel = personnel._id;
                   nextIncident.dispatchStatus = 'dispatched';
+                  if (nextIncident.status === 'resolved') {
+                    nextIncident.status = 'active';
+                  }
+                  nextIncident.workflow = nextIncident.workflow || {};
+                  if (!nextIncident.workflow.allocatedAt) {
+                    nextIncident.workflow.allocatedAt = new Date();
+                  }
                   if (personnel.assignedResource) {
                     nextIncident.assignedResources = [personnel.assignedResource];
                   }
                   await nextIncident.save();
                 }
-              } else {
+              } else if (isResolvingCurrent) {
+                personnel.taskQueue = sanitizedQueue;
                 personnel.status = 'available';
                 personnel.currentIncident = null;
-                // Resource also becomes available if no more tasks
                 if (personnel.assignedResource) {
-                  await Resource.findByIdAndUpdate(personnel.assignedResource, { 
-                    status: 'available', 
+                  await Resource.findByIdAndUpdate(personnel.assignedResource, {
+                    status: 'available',
                     currentIncident: null,
-                    assignedPersonnel: null 
+                    assignedPersonnel: null,
                   });
                 }
+                await personnel.save();
+              } else {
+                personnel.taskQueue = sanitizedQueue;
                 await personnel.save();
               }
             }

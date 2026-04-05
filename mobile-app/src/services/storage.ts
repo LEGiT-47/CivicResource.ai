@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const COMPLAINT_QUEUE_KEY = 'civicresource_mobile_queue';
 const LAST_CITIZEN_STATE_KEY = 'civicresource_mobile_last_citizen_status';
 const LAST_WORKER_ASSIGNMENT_KEY = 'civicresource_mobile_last_worker_assignment';
+const LAST_WORKER_STATE_KEY = 'civicresource_mobile_last_worker_state';
 
 export interface QueuedComplaint {
   title: string;
@@ -41,6 +42,15 @@ export const setLastCitizenState = async (state: Record<string, string>) => {
 
 export const getLastCitizenState = async (): Promise<Record<string, string>> => {
   const value = await AsyncStorage.getItem(LAST_CITIZEN_STATE_KEY);
+  return value ? JSON.parse(value) : {};
+};
+
+export const setLastWorkerState = async (state: Record<string, string>) => {
+  await AsyncStorage.setItem(LAST_WORKER_STATE_KEY, JSON.stringify(state));
+};
+
+export const getLastWorkerState = async (): Promise<Record<string, string>> => {
+  const value = await AsyncStorage.getItem(LAST_WORKER_STATE_KEY);
   return value ? JSON.parse(value) : {};
 };
 

@@ -8,7 +8,8 @@ import generateToken from '../utils/generateToken.js';
 export const authUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const normalizedEmail = String(email || '').trim().toLowerCase();
+    const user = await User.findOne({ email: normalizedEmail });
 
     if (user && (await user.matchPassword(password))) {
       res.json({

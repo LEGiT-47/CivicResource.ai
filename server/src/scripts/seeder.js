@@ -335,7 +335,9 @@ const seedData = async () => {
       { title: 'Streetlight blackout corridor in Jogeshwari East', type: 'utility', severity: 'medium', location: { lat: 19.132, lng: 72.857, address: 'Jogeshwari East, Mumbai' }, aiPredictionConfidence: 79 },
       { title: 'Transformer overload alerts in Ghatkopar West', type: 'utility', severity: 'high', location: { lat: 19.09, lng: 72.89, address: 'Ghatkopar West, Mumbai' }, aiPredictionConfidence: 87 },
       { title: 'Traffic diversions causing service delays near Dharavi', type: 'traffic', severity: 'medium', location: { lat: 19.045, lng: 72.86, address: 'Dharavi Main Road, Mumbai' }, aiPredictionConfidence: 76 },
-      { title: 'Roadside debris obstructing tanker routes', type: 'infrastructure', severity: 'high', location: { lat: 19.02, lng: 72.872, address: 'Lower Parel Connector, Mumbai' }, aiPredictionConfidence: 83 }
+      { title: 'Roadside debris obstructing tanker routes', type: 'infrastructure', severity: 'high', location: { lat: 19.02, lng: 72.872, address: 'Lower Parel Connector, Mumbai' }, aiPredictionConfidence: 83 },
+      { title: 'Water shortage complaints near Goregaon West market lane', type: 'water', severity: 'high', location: { lat: 19.1662, lng: 72.8491, address: 'Goregaon West Market Lane, Mumbai' }, aiPredictionConfidence: 91 },
+      { title: 'Irregular municipal supply in Goregaon SV Road belt', type: 'water', severity: 'high', location: { lat: 19.1681, lng: 72.8514, address: 'SV Road, Goregaon West, Mumbai' }, aiPredictionConfidence: 90 }
     ]);
 
     // Reset seed to a neutral dispatch state:

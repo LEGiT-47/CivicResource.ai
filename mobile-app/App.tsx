@@ -13,9 +13,10 @@ import {
 import MapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
 import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
+import Constants from 'expo-constants';
 
 import { tr } from './src/i18n';
-import { api, withAuthHeader } from './src/services/api';
+import { api, getApiBaseUrl, loginWithBaseFallback, withAuthHeader } from './src/services/api';
 import { getAddressFromCoordinates, getCurrentLocation } from './src/services/location';
 import { normalizeText } from './src/services/nlp';
 import { ensureNotificationPermission, sendLocalNotification } from './src/services/notifications';
@@ -23,10 +24,12 @@ import {
   clearQueuedComplaints,
   getLastCitizenState,
   getLastWorkerAssignment,
+  getLastWorkerState,
   getQueuedComplaints,
   pushQueuedComplaint,
   setLastCitizenState,
   setLastWorkerAssignment,
+  setLastWorkerState,
 } from './src/services/storage';
 import type { AppLanguage, PublicIncident, WorkerAssignmentsResponse } from './src/types';
 
@@ -46,6 +49,10 @@ const complaintTypes = [
 type AppRole = 'citizen' | 'worker';
 
 const MUMBAI_CENTER = { latitude: 19.076, longitude: 72.8777 };
+const hasGoogleMapsApiKey = Boolean(
+  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY ||
+  (Constants.expoConfig as any)?.android?.config?.googleMaps?.apiKey
+);
 
 export default function App() {
   const [role, setRole] = useState<AppRole>('citizen');
@@ -84,6 +91,7 @@ export default function App() {
   const [workerAssignments, setWorkerAssignments] = useState<PublicIncident[]>([]);
   const [workerActive, setWorkerActive] = useState<PublicIncident | null>(null);
   const [workerLoading, setWorkerLoading] = useState(false);
+  const [statusBanner, setStatusBanner] = useState<{ tone: 'info' | 'success' | 'warn'; text: string } | null>(null);
 
   const t = useMemo(() => (key: string) => tr(language, key), [language]);
 
@@ -194,6 +202,11 @@ export default function App() {
 
       const { data } = await api.post('/public/incidents', payload);
       setLastTrackingId(data?.trackingId || 'Generated');
+      if (data?.trackingId) {
+        setTrackerPhone(phone.replace(/\D/g, ''));
+        setTrackerId(data.trackingId);
+        await runTracker(phone.replace(/\D/g, ''), data.trackingId);
+      }
       await sendLocalNotification('Complaint Filed', `Tracking ID: ${data?.trackingId || 'Generated'}`);
     } catch {
       Alert.alert('Error', 'Unable to submit complaint.');
@@ -202,8 +215,11 @@ export default function App() {
     }
   };
 
-  const runTracker = async () => {
-    if (!trackerPhone.trim() && !trackerId.trim()) {
+  const runTracker = async (phoneOverride?: string, trackingIdOverride?: string) => {
+    const resolvedPhone = phoneOverride?.trim() || trackerPhone.trim();
+    const resolvedTrackingId = trackingIdOverride?.trim() || trackerId.trim();
+
+    if (!resolvedPhone && !resolvedTrackingId) {
       Alert.alert('Validation', 'Enter phone or tracking ID.');
       return;
     }
@@ -212,8 +228,8 @@ export default function App() {
     try {
       const { data } = await api.get('/public/incidents/track', {
         params: {
-          phone: trackerPhone.trim() || undefined,
-          trackingId: trackerId.trim() || undefined,
+          phone: resolvedPhone || undefined,
+          trackingId: resolvedTrackingId || undefined,
         },
       });
       setTracked(data || []);
@@ -245,10 +261,12 @@ export default function App() {
         const { data } = await api.get(`/public/incidents/${incident._id}`);
         const tracking = data?.trackingId || incident.trackingId || incident._id;
         const status = data?.status || 'active';
-        next[tracking] = status;
+        const dispatchStatus = data?.dispatchStatus || 'active';
+        const signature = `${status}:${dispatchStatus}`;
+        next[tracking] = signature;
 
-        if (previous[tracking] && previous[tracking] !== status) {
-          await sendLocalNotification('Complaint Update', `${tracking}: ${status}`);
+        if (previous[tracking] && previous[tracking] !== signature) {
+          await sendLocalNotification('Complaint Update', `${tracking}: ${status} (${dispatchStatus})`);
         }
       }
 
@@ -263,14 +281,16 @@ export default function App() {
   }, [tracked]);
 
   const workerLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail || !password.trim()) {
       Alert.alert('Validation', 'Email and password are required.');
       return;
     }
 
     setWorkerLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email: email.trim(), password });
+      const data = await loginWithBaseFallback(normalizedEmail, password);
       setWorkerToken(data.token);
       setWorkerName(data.name || 'Worker');
       setWorkerUnitId(data.unitId || '');
@@ -278,9 +298,11 @@ export default function App() {
         setUnitId(data.unitId);
       }
       Alert.alert('Login', 'Worker login successful.');
-      await loadWorkerAssignments(data.token, data.unitId || unitId);
-    } catch {
-      Alert.alert('Login Failed', 'Invalid credentials.');
+      // Keep login responsive; load assignments in the background.
+      loadWorkerAssignments(data.token, data.unitId || unitId).catch(() => {});
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Invalid credentials or server unreachable.';
+      Alert.alert('Login Failed', `${message}\nAPI: ${getApiBaseUrl()}`);
     } finally {
       setWorkerLoading(false);
     }
@@ -293,6 +315,7 @@ export default function App() {
     setUnitId('');
     setWorkerAssignments([]);
     setWorkerActive(null);
+    setLastWorkerState({}).catch(() => {});
     Alert.alert('Logout', 'Worker session cleared.');
   };
 
@@ -343,14 +366,25 @@ export default function App() {
         items[0] ||
         null;
       setWorkerActive(active);
+      if (active?.clustering?.clusterId) {
+        setStatusBanner({
+          tone: 'info',
+          text: `Cluster ${active.clustering.clusterId} active: stop ${active.clustering.stopOrder || 1}/${active.clustering.totalStops || 1}`,
+        });
+      }
 
       const previousActive = await getLastWorkerAssignment();
+      const previousState = await getLastWorkerState();
       const nextActive = active?._id || null;
+      const nextSignature = nextActive ? `${String(active?.status || 'active')}:${String(active?.dispatchStatus || 'active')}` : '';
       if (nextActive && previousActive !== nextActive) {
         const initLink = `civicresource://worker/initialize?incident=${nextActive}`;
         await sendLocalNotification('New Assignment', `${active?.title || 'Incident assigned'}\n${t('assignmentInstruction')}\n${initLink}`);
+      } else if (nextActive && previousState[nextActive] && previousState[nextActive] !== nextSignature) {
+        await sendLocalNotification('Assignment Update', `${active?.title || 'Incident assigned'}\n${String(active?.status || 'active')} / ${String(active?.dispatchStatus || 'active')}`);
       }
       await setLastWorkerAssignment(nextActive);
+      await setLastWorkerState(nextActive ? { [nextActive]: nextSignature } : {});
       return;
     } catch {
       // Fallback path for older backend behavior where unit endpoint is used.
@@ -369,14 +403,25 @@ export default function App() {
 
       setWorkerAssignments(data.assignedIncidents || []);
       setWorkerActive(data.activeIncident || null);
+      if (data.activeIncident?.clustering?.clusterId) {
+        setStatusBanner({
+          tone: 'info',
+          text: `Cluster ${data.activeIncident.clustering.clusterId} active: stop ${data.activeIncident.clustering.stopOrder || 1}/${data.activeIncident.clustering.totalStops || 1}`,
+        });
+      }
 
       const previousActive = await getLastWorkerAssignment();
+      const previousState = await getLastWorkerState();
       const nextActive = data.activeIncident?._id || null;
+      const nextSignature = nextActive ? `${String(data.activeIncident?.status || 'active')}:${String(data.activeIncident?.dispatchStatus || 'active')}` : '';
       if (nextActive && previousActive !== nextActive) {
         const initLink = `civicresource://worker/initialize?incident=${nextActive}`;
         await sendLocalNotification('New Assignment', `${data.activeIncident?.title || 'Incident assigned'}\n${t('assignmentInstruction')}\n${initLink}`);
+      } else if (nextActive && previousState[nextActive] && previousState[nextActive] !== nextSignature) {
+        await sendLocalNotification('Assignment Update', `${data.activeIncident?.title || 'Incident assigned'}\n${String(data.activeIncident?.status || 'active')} / ${String(data.activeIncident?.dispatchStatus || 'active')}`);
       }
       await setLastWorkerAssignment(nextActive);
+      await setLastWorkerState(nextActive ? { [nextActive]: nextSignature } : {});
     } catch {
       Alert.alert('Error', 'Unable to load worker assignments.');
     }
@@ -395,7 +440,13 @@ export default function App() {
   }, [workerToken, workerUnitId, unitId, language]);
 
   const initializeWorkerRoute = async () => {
-    if (!workerToken || !workerActive?._id) {
+    if (!workerToken || !workerActive?._id || !canInitializeWorker) {
+      setStatusBanner({
+        tone: 'warn',
+        text: workerActive?.clustering?.clusterId
+          ? `Stop ${stopOrder}/${totalStops} cannot be initialized yet.`
+          : 'This incident is not ready for initialize.',
+      });
       Alert.alert('Action', 'No active assignment to initialize.');
       return;
     }
@@ -420,6 +471,12 @@ export default function App() {
 
       await sendLocalNotification('Route Initialized', t('routeInitialized'));
       await loadWorkerAssignments();
+      setStatusBanner({
+        tone: 'success',
+        text: workerActive?.clustering?.clusterId
+          ? `Stop ${workerActive?.clustering?.stopOrder || 1} initialized. Continue to location.`
+          : t('routeInitialized'),
+      });
       Alert.alert('Route', t('routeInitialized'));
     } catch (err: any) {
       const message = err?.response?.data?.message || 'Unable to initialize route right now.';
@@ -430,7 +487,13 @@ export default function App() {
   };
 
   const resolveWorkerIncident = async () => {
-    if (!workerToken || !workerActive?._id) {
+    if (!workerToken || !workerActive?._id || !canResolveWorker) {
+      setStatusBanner({
+        tone: 'warn',
+        text: workerActive?.clustering?.clusterId
+          ? `Resolve unlocks after stop ${stopOrder}/${totalStops} is in-progress.`
+          : 'Resolve becomes available after route engagement.',
+      });
       Alert.alert('Action', 'No active assignment to resolve.');
       return;
     }
@@ -440,6 +503,12 @@ export default function App() {
       await api.put(`/incidents/${workerActive._id}/status`, { status: 'resolved' }, withAuthHeader(workerToken));
       await sendLocalNotification('Incident Resolved', t('incidentResolved'));
       await loadWorkerAssignments();
+      setStatusBanner({
+        tone: 'success',
+        text: workerActive?.clustering?.clusterId
+          ? `Stop ${workerActive?.clustering?.stopOrder || 1} resolved. Loading next stop...`
+          : t('incidentResolved'),
+      });
       Alert.alert('Resolve', t('incidentResolved'));
     } catch (err: any) {
       const message = err?.response?.data?.message || 'Unable to resolve incident right now.';
@@ -455,8 +524,14 @@ export default function App() {
   const sourceLat = Number.isFinite(Number(activeTracking?.lat)) ? Number(activeTracking?.lat) : Number.isFinite(destinationLat) ? destinationLat - 0.01 : MUMBAI_CENTER.latitude;
   const sourceLng = Number.isFinite(Number(activeTracking?.lng)) ? Number(activeTracking?.lng) : Number.isFinite(destinationLng) ? destinationLng - 0.01 : MUMBAI_CENTER.longitude;
   const hasWorkerRoute = Number.isFinite(destinationLat) && Number.isFinite(destinationLng);
-  const initializeLink = workerActive?._id ? `civicresource://worker/initialize?incident=${workerActive._id}` : '';
-  const resolveLink = workerActive?._id ? `civicresource://worker/resolve?incident=${workerActive._id}` : '';
+  const isWorkerResolved = Boolean(workerActive && (workerActive.status === 'resolved' || workerActive.dispatchStatus === 'completed'));
+  const isWorkerEngaged = Boolean(workerActive && (workerActive.status === 'investigating' || workerActive.dispatchStatus === 'on-site' || workerActive.dispatchStatus === 'resolving'));
+  const canInitializeWorker = Boolean(workerActive) && !isWorkerResolved && !isWorkerEngaged && !workerLoading;
+  const canResolveWorker = Boolean(workerActive) && !isWorkerResolved && isWorkerEngaged && !workerLoading;
+  const stopOrder = Number(workerActive?.clustering?.stopOrder || 1);
+  const totalStops = Number(workerActive?.clustering?.totalStops || 1);
+  const initializeActionLabel = workerActive?.clustering?.clusterId ? `Initialize Stop ${stopOrder}/${totalStops}` : t('initializeRoute');
+  const resolveActionLabel = workerActive?.clustering?.clusterId ? `Resolve Stop ${stopOrder}/${totalStops}` : t('markResolved');
   const clusterInstruction =
     workerActive?.clustering?.instructionByLanguage?.[language] ||
     workerActive?.clustering?.instructionByLanguage?.english ||
@@ -466,19 +541,45 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{t('appTitle')}</Text>
+        <View style={styles.heroCard}>
+          <View style={styles.heroTopRow}>
+            <View>
+              <Text style={styles.heroEyebrow}>CivicResource Mobile</Text>
+              <Text style={styles.heroTitle}>{t('appTitle')}</Text>
+            </View>
+            <View style={styles.heroStatusPill}>
+              <Text style={styles.heroStatusText}>{isOnline ? t('online') : t('offline')}</Text>
+            </View>
+          </View>
 
-        <View style={styles.actionRow}>
-          <Pressable style={styles.refreshBtn} onPress={() => reloadCurrentView().catch(() => Alert.alert('Reload', 'Unable to refresh right now.'))}>
-            <Text style={styles.refreshBtnText}>Reload</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.logoutBtn, !(role === 'worker' && workerToken) && styles.disabledBtn]}
-            onPress={workerLogout}
-            disabled={!(role === 'worker' && workerToken)}
-          >
-            <Text style={styles.logoutBtnText}>Logout</Text>
-          </Pressable>
+          <Text style={styles.heroDescription}>
+            Citizen complaints, worker assignments, and notifications in one simple mobile flow.
+          </Text>
+
+          <View style={styles.heroMetaRow}>
+            <View style={[styles.heroChip, role === 'citizen' && styles.heroChipActive]}>
+              <Text style={[styles.heroChipText, role === 'citizen' && styles.heroChipTextActive]}>{t('citizen')}</Text>
+            </View>
+            <View style={[styles.heroChip, role === 'worker' && styles.heroChipActive]}>
+              <Text style={[styles.heroChipText, role === 'worker' && styles.heroChipTextActive]}>{t('worker')}</Text>
+            </View>
+            <View style={styles.heroChip}>
+              <Text style={styles.heroChipText}>{t('queued')}: {queueCount}</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionRow}>
+            <Pressable style={styles.refreshBtn} onPress={() => reloadCurrentView().catch(() => Alert.alert('Reload', 'Unable to refresh right now.'))}>
+              <Text style={styles.refreshBtnText}>Reload</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.logoutBtn, !(role === 'worker' && workerToken) && styles.disabledBtn]}
+              onPress={workerLogout}
+              disabled={!(role === 'worker' && workerToken)}
+            >
+              <Text style={styles.logoutBtnText}>Logout</Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.row}>
@@ -503,6 +604,11 @@ export default function App() {
         </View>
 
         <Text style={styles.network}>{isOnline ? t('online') : t('offline')} • {t('queued')}: {queueCount}</Text>
+        {statusBanner ? (
+          <View style={[styles.banner, statusBanner.tone === 'success' ? styles.bannerSuccess : statusBanner.tone === 'warn' ? styles.bannerWarn : styles.bannerInfo]}>
+            <Text style={styles.bannerText}>{statusBanner.text}</Text>
+          </View>
+        ) : null}
 
         {role === 'citizen' ? (
           <View style={styles.card}>
@@ -529,12 +635,19 @@ export default function App() {
             </Pressable>
 
             {showMapPicker ? (
-              <View style={styles.mapWrapper}>
-                <MapView style={styles.map} initialRegion={mapRegion} region={mapRegion} onPress={pickLocationFromMap}>
-                  {lat != null && lng != null ? <Marker coordinate={{ latitude: lat, longitude: lng }} /> : null}
-                </MapView>
-                <Text style={styles.mapHint}>Tap on map to pin complaint location.</Text>
-              </View>
+              hasGoogleMapsApiKey ? (
+                <View style={styles.mapWrapper}>
+                  <MapView style={styles.map} initialRegion={mapRegion} region={mapRegion} onPress={pickLocationFromMap}>
+                    {lat != null && lng != null ? <Marker coordinate={{ latitude: lat, longitude: lng }} /> : null}
+                  </MapView>
+                  <Text style={styles.mapHint}>Tap on map to pin complaint location.</Text>
+                </View>
+              ) : (
+                <View style={styles.mapFallbackBox}>
+                  <Text style={styles.mapFallbackTitle}>Map preview unavailable</Text>
+                  <Text style={styles.mapFallbackText}>Google Maps API key is missing on this Android build. You can still submit using address or current location.</Text>
+                </View>
+              )
             ) : null}
 
             <Pressable style={styles.primaryBtn} onPress={submitComplaint} disabled={submitLoading}>
@@ -609,19 +722,25 @@ export default function App() {
                     </View>
                   ) : null}
 
-                  <Pressable style={styles.linkBtn} onPress={initializeWorkerRoute} disabled={workerLoading}>
-                    <Text style={styles.linkBtnText}>{t('initializeRoute')}</Text>
-                    <Text style={styles.linkUrl}>{initializeLink}</Text>
+                  <Pressable
+                    style={[styles.linkBtn, !canInitializeWorker && styles.linkBtnDisabled]}
+                    onPress={initializeWorkerRoute}
+                    disabled={!canInitializeWorker}
+                  >
+                    <Text style={styles.linkBtnText}>{initializeActionLabel}</Text>
                   </Pressable>
 
-                  <Pressable style={styles.linkBtnSecondary} onPress={resolveWorkerIncident} disabled={workerLoading}>
-                    <Text style={styles.linkBtnSecondaryText}>{t('markResolved')}</Text>
-                    <Text style={styles.linkUrl}>{resolveLink}</Text>
+                  <Pressable
+                    style={[styles.linkBtnSecondary, !canResolveWorker && styles.linkBtnSecondaryDisabled]}
+                    onPress={resolveWorkerIncident}
+                    disabled={!canResolveWorker}
+                  >
+                    <Text style={styles.linkBtnSecondaryText}>{resolveActionLabel}</Text>
                   </Pressable>
                 </View>
 
                 <Text style={[styles.sectionTitle, { marginTop: 12 }]}>{t('routeMap')}</Text>
-                {hasWorkerRoute ? (
+                {hasWorkerRoute && hasGoogleMapsApiKey ? (
                   <View style={styles.mapWrapper}>
                     <MapView
                       style={styles.map}
@@ -644,6 +763,11 @@ export default function App() {
                       <Marker coordinate={{ latitude: destinationLat, longitude: destinationLng }} title={t('destination')} />
                     </MapView>
                     <Text style={styles.mapHint}>{t('source')} → {t('destination')}</Text>
+                  </View>
+                ) : hasWorkerRoute ? (
+                  <View style={styles.mapFallbackBox}>
+                    <Text style={styles.mapFallbackTitle}>Route map unavailable</Text>
+                    <Text style={styles.mapFallbackText}>Google Maps API key is missing on this Android build. Assignment actions still work.</Text>
                   </View>
                 ) : (
                   <Text style={styles.muted}>{t('noActiveAssignment')}</Text>
@@ -680,9 +804,80 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
+  heroCard: {
+    backgroundColor: '#0f172a',
+    borderRadius: 24,
+    padding: 18,
+    gap: 12,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  heroEyebrow: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    textTransform: 'uppercase',
+  },
   title: {
     fontSize: 26,
     fontWeight: '800',
+    color: '#0f172a',
+  },
+  heroTitle: {
+    marginTop: 4,
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#ffffff',
+    letterSpacing: -0.5,
+  },
+  heroDescription: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    lineHeight: 19,
+    fontWeight: '600',
+  },
+  heroStatusPill: {
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  heroStatusText: {
+    color: '#0f172a',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  heroMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  heroChip: {
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  heroChipActive: {
+    backgroundColor: '#ffffff',
+  },
+  heroChipText: {
+    color: '#cbd5e1',
+    fontSize: 11,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  heroChipTextActive: {
     color: '#0f172a',
   },
   row: {
@@ -830,6 +1025,48 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     fontWeight: '600',
   },
+  mapFallbackBox: {
+    borderColor: '#cbd5e1',
+    borderWidth: 1,
+    borderRadius: 10,
+    backgroundColor: '#f8fafc',
+    padding: 12,
+    gap: 4,
+  },
+  mapFallbackTitle: {
+    color: '#0f172a',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  mapFallbackText: {
+    color: '#64748b',
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '600',
+  },
+  banner: {
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+  },
+  bannerInfo: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+  },
+  bannerSuccess: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#bbf7d0',
+  },
+  bannerWarn: {
+    backgroundColor: '#fff7ed',
+    borderColor: '#fed7aa',
+  },
+  bannerText: {
+    color: '#0f172a',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   badge: {
     fontWeight: '700',
     color: '#1e293b',
@@ -908,6 +1145,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 4,
   },
+  linkBtnDisabled: {
+    backgroundColor: '#1e293b',
+    opacity: 0.88,
+  },
   linkBtnText: {
     color: '#ffffff',
     fontWeight: '800',
@@ -921,13 +1162,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 4,
   },
+  linkBtnSecondaryDisabled: {
+    borderColor: '#334155',
+    backgroundColor: '#f8fafc',
+  },
   linkBtnSecondaryText: {
     color: '#0f172a',
     fontWeight: '800',
-  },
-  linkUrl: {
-    color: '#94a3b8',
-    fontSize: 11,
-    fontWeight: '600',
   },
 });
