@@ -1113,29 +1113,53 @@ export const applyPlanLive = async (req, res) => {
 
     const personnelPool = await Personnel.find({ status: 'available' });
     const resourceById = new Map(resources.map((r) => [String(r._id), r]));
-    const newestIncident = incidents[0] || null;
-    const prioritizedAllocations = [...(allocationResp?.allocations || [])];
+    const newestIncident = incidents.find((incident) => String(incident?.dispatchStatus || '').toLowerCase() === 'unassigned') || incidents[0] || null;
+    const aiAllocations = [...(allocationResp?.allocations || [])];
+    const fallbackAllocations = incidents
+      .filter((incident) => String(incident?.dispatchStatus || '').toLowerCase() === 'unassigned')
+      .sort((a, b) => {
+        const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+        const aFresh = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bFresh = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return (severityOrder[b?.severity] || 0) - (severityOrder[a?.severity] || 0) || (bFresh - aFresh);
+      })
+      .slice(0, Math.max(maxAssignments * 2, 6))
+      .map((incident) => {
+        const zoneId = `${Math.round(safeNumber(incident?.location?.lat, 19.076) * 10) / 10}_${Math.round(safeNumber(incident?.location?.lng, 72.8777) * 10) / 10}`;
+        const nearestResource = [...resources]
+          .filter((r) => r.status !== 'offline' && r.status !== 'dispatched' && r.status !== 'maintenance')
+          .sort((a, b) => distanceKm(a.location, incident.location) - distanceKm(b.location, incident.location))[0];
+
+        return {
+          zone_id: zoneId,
+          preferred_family: classifyIncidentFamily(incident),
+          resource_id: nearestResource ? String(nearestResource._id) : null,
+          priority_incident_id: String(incident._id),
+          urgency_score: 50,
+        };
+      });
+
+    const prioritizedAllocations = aiAllocations.length > 0 ? aiAllocations : fallbackAllocations;
 
     if (newestIncident && prioritizedAllocations.length > 0) {
       const newestIncidentId = String(newestIncident._id);
-      const alreadySelected = prioritizedAllocations.some((allocation) => {
-        const zoneIncidents = incidentsByZone[String(allocation.zone_id)] || [];
-        return zoneIncidents.some((incident) => String(incident._id) === newestIncidentId);
-      });
+      const alreadySelected = prioritizedAllocations.some(
+        (allocation) => String(allocation?.priority_incident_id || '') === newestIncidentId
+      );
 
       if (!alreadySelected) {
-        const firstAllocation = prioritizedAllocations[0];
-        const firstResource = resourceById.get(String(firstAllocation.resource_id));
+        const firstAllocation = prioritizedAllocations[0] || {};
+        const nearestAvailableResource = [...resources]
+          .filter((r) => r.status !== 'offline' && r.status !== 'dispatched' && r.status !== 'maintenance')
+          .sort((a, b) => distanceKm(a.location, newestIncident.location) - distanceKm(b.location, newestIncident.location))[0];
 
-        if (firstResource && firstResource.status !== 'dispatched' && firstResource.status !== 'maintenance') {
-          prioritizedAllocations.unshift({
-            ...firstAllocation,
-            zone_id: `${Math.round(safeNumber(newestIncident?.location?.lat, 19.076) * 10) / 10}_${Math.round(safeNumber(newestIncident?.location?.lng, 72.8777) * 10) / 10}`,
-            preferred_family: classifyIncidentFamily(newestIncident),
-            resource_id: String(firstResource._id),
-            priority_incident_id: newestIncidentId,
-          });
-        }
+        prioritizedAllocations.unshift({
+          ...firstAllocation,
+          zone_id: `${Math.round(safeNumber(newestIncident?.location?.lat, 19.076) * 10) / 10}_${Math.round(safeNumber(newestIncident?.location?.lng, 72.8777) * 10) / 10}`,
+          preferred_family: classifyIncidentFamily(newestIncident),
+          resource_id: nearestAvailableResource ? String(nearestAvailableResource._id) : (firstAllocation.resource_id ? String(firstAllocation.resource_id) : null),
+          priority_incident_id: newestIncidentId,
+        });
       }
     }
 
@@ -1194,32 +1218,21 @@ export const applyPlanLive = async (req, res) => {
             scoreResourceForIncident({ incident: targetIncident, resource: b, aiPreferredResourceId: aiPreferredResource?._id })
         );
 
-      const resource = candidateResources[0] || aiPreferredResource;
-      if (!resource) continue;
+      const resource = candidateResources[0] || aiPreferredResource || null;
 
-      const previousIncidentId = resource.currentIncident ? String(resource.currentIncident) : null;
-      if (previousIncidentId && previousIncidentId !== String(targetIncident._id)) {
-        await Incident.findByIdAndUpdate(previousIncidentId, {
-          $pull: { assignedResources: resource._id },
-        });
-      }
+      if (resource) {
+        const previousIncidentId = resource.currentIncident ? String(resource.currentIncident) : null;
+        if (previousIncidentId && previousIncidentId !== String(targetIncident._id)) {
+          await Incident.findByIdAndUpdate(previousIncidentId, {
+            $pull: { assignedResources: resource._id },
+          });
+        }
 
-      resource.status = 'dispatched';
-      resource.currentIncident = targetIncident._id;
-      await resource.save();
-      usedResourceIds.add(String(resource._id));
-
-      targetIncident.dispatchStatus = 'dispatched';
-      if (targetIncident.status === 'resolved') {
-        targetIncident.status = 'active';
+        resource.status = 'dispatched';
+        resource.currentIncident = targetIncident._id;
+        await resource.save();
+        usedResourceIds.add(String(resource._id));
       }
-      targetIncident.assignedResources = targetIncident.assignedResources || [];
-      if (!targetIncident.assignedResources.map((id) => String(id)).includes(String(resource._id))) {
-        targetIncident.assignedResources.push(resource._id);
-      }
-      targetIncident.workflow = targetIncident.workflow || {};
-      if (!targetIncident.workflow.allocatedAt) targetIncident.workflow.allocatedAt = new Date();
-      if (!targetIncident.workflow.enRouteAt) targetIncident.workflow.enRouteAt = new Date();
 
       let assignedPersonnel = null;
       if (!targetIncident.assignedPersonnel) {
@@ -1250,6 +1263,24 @@ export const applyPlanLive = async (req, res) => {
         }
       }
 
+      const alreadyHasPersonnel = Boolean(targetIncident.assignedPersonnel);
+      const hasDispatchCapacity = Boolean(resource) || alreadyHasPersonnel || Boolean(assignedPersonnel);
+      if (!hasDispatchCapacity) {
+        continue;
+      }
+
+      targetIncident.dispatchStatus = 'dispatched';
+      if (targetIncident.status === 'resolved') {
+        targetIncident.status = 'active';
+      }
+      targetIncident.assignedResources = targetIncident.assignedResources || [];
+      if (resource && !targetIncident.assignedResources.map((id) => String(id)).includes(String(resource._id))) {
+        targetIncident.assignedResources.push(resource._id);
+      }
+      targetIncident.workflow = targetIncident.workflow || {};
+      if (!targetIncident.workflow.allocatedAt) targetIncident.workflow.allocatedAt = new Date();
+      if (!targetIncident.workflow.enRouteAt) targetIncident.workflow.enRouteAt = new Date();
+
       await targetIncident.save();
       usedIncidentIds.add(String(targetIncident._id));
 
@@ -1258,17 +1289,78 @@ export const applyPlanLive = async (req, res) => {
         incidentTitle: targetIncident.title,
         incidentType: targetIncident.type,
         zoneId: allocation.zone_id,
-        resource: {
-          id: String(resource._id),
-          name: resource.name,
-          type: resource.type,
-        },
+        resource: resource
+          ? {
+              id: String(resource._id),
+              name: resource.name,
+              type: resource.type,
+            }
+          : null,
         personnel: assignedPersonnel,
-        etaMinutes: Math.max(3, Math.round(distanceKm(resource.location, targetIncident.location) / 0.45)),
+        etaMinutes: resource
+          ? Math.max(3, Math.round(distanceKm(resource.location, targetIncident.location) / 0.45))
+          : null,
         urgencyScore: allocation.urgency_score,
-        distanceKm: Number(distanceKm(resource.location, targetIncident.location).toFixed(2)),
-        resourceFamily: classifyResourceServiceFamily(resource),
+        distanceKm: resource ? Number(distanceKm(resource.location, targetIncident.location).toFixed(2)) : null,
+        resourceFamily: resource ? classifyResourceServiceFamily(resource) : 'personnel-only',
       });
+    }
+
+    if (applied.length === 0) {
+      const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+      const fallbackIncidents = incidents
+        .filter((incident) => String(incident?.dispatchStatus || '').toLowerCase() === 'unassigned')
+        .sort((a, b) => {
+          const aFresh = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bFresh = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return (severityOrder[b?.severity] || 0) - (severityOrder[a?.severity] || 0) || (bFresh - aFresh);
+        });
+
+      for (const incident of fallbackIncidents) {
+        const requiredType = incidentToPersonnelType(incident);
+        const nearest = personnelPool
+          .filter((p) => p.status === 'available' && p.type === requiredType)
+          .sort((a, b) => distanceKm(a.location, incident.location) - distanceKm(b.location, incident.location))[0];
+
+        if (!nearest) continue;
+
+        nearest.status = 'busy';
+        nearest.currentIncident = incident._id;
+        await nearest.save();
+
+        incident.dispatchStatus = 'dispatched';
+        if (incident.status === 'resolved') {
+          incident.status = 'active';
+        }
+        incident.assignedPersonnel = nearest._id;
+        incident.assignedPersonnelList = incident.assignedPersonnelList || [];
+        if (!incident.assignedPersonnelList.map((id) => String(id)).includes(String(nearest._id))) {
+          incident.assignedPersonnelList.push(nearest._id);
+        }
+        incident.workflow = incident.workflow || {};
+        if (!incident.workflow.allocatedAt) incident.workflow.allocatedAt = new Date();
+        if (!incident.workflow.enRouteAt) incident.workflow.enRouteAt = new Date();
+        await incident.save();
+
+        const zoneId = `${Math.round(safeNumber(incident?.location?.lat, 19.076) * 10) / 10}_${Math.round(safeNumber(incident?.location?.lng, 72.8777) * 10) / 10}`;
+        applied.push({
+          incidentId: String(incident._id),
+          incidentTitle: incident.title,
+          incidentType: incident.type,
+          zoneId,
+          resource: null,
+          personnel: {
+            id: String(nearest._id),
+            name: nearest.name,
+            unitId: nearest.contact?.unitId,
+          },
+          etaMinutes: null,
+          urgencyScore: 50,
+          distanceKm: Number(distanceKm(nearest.location, incident.location).toFixed(2)),
+          resourceFamily: 'personnel-only',
+        });
+        break;
+      }
     }
 
     return res.status(200).json({
