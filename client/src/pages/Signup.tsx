@@ -16,7 +16,8 @@ export default function Signup() {
     name: "",
     email: "",
     password: "",
-      role: "worker"
+      role: "worker",
+    department: ""
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -33,8 +34,9 @@ export default function Signup() {
         name: formData.name,
         email: formData.email,
         password: formData.password,
-      organization: "CivicResource.ai Registry",
-        role: backendRole
+        organization: "CivicResource.ai Registry",
+        role: backendRole,
+        department: formData.role === "worker" ? formData.department || "utility" : undefined
       };
 
       const { data } = await api.post("/auth/register", payload);
@@ -134,6 +136,25 @@ export default function Signup() {
                      ))}
                   </div>
                </div>
+
+               {formData.role === "worker" && (
+                 <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 ml-2">Assigned Department</label>
+                    <select 
+                       required
+                       className="concierge-input w-full px-6 py-5 bg-slate-50 focus:bg-white text-[10px] font-black uppercase tracking-widest appearance-none outline-none"
+                       value={formData.department}
+                       onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    >
+                       <option value="">Select Department Protocol</option>
+                       <option value="police">Police Dispatch Unit</option>
+                       <option value="fire">Fire & Rescue Command</option>
+                       <option value="medical">Medical Emergency Response</option>
+                       <option value="utility">Municipal Utility Service</option>
+                       <option value="sanitation">Environmental Sanitation</option>
+                    </select>
+                 </motion.div>
+               )}
 
                {error && (
                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-5 rounded-2xl bg-red-50 border border-red-100 flex gap-4 text-red-600">

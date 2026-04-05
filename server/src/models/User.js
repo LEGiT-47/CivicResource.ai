@@ -33,6 +33,10 @@ const userSchema = mongoose.Schema(
       sparse: true,
       unique: true,
     },
+    department: {
+      type: String,
+      enum: ['police', 'fire', 'medical', 'utility', 'sanitation'],
+    },
   },
   {
     timestamps: true,

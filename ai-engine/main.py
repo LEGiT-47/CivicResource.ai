@@ -126,9 +126,23 @@ class ResourceUnit(BaseModel):
     lng: float
 
 
+class PersonnelUnit(BaseModel):
+    id: str
+    name: str
+    type: str
+    status: str
+    lat: float
+    lng: float
+    current_task_eta_minutes: float = 0
+    assigned_resource_id: str | None = None
+
+
 class AllocationRequest(BaseModel):
     zones: List[DemandZone]
     resources: List[ResourceUnit]
+    personnel: List[PersonnelUnit] | None = None
+    traffic_index: float = 1.0
+    road_condition_index: float = 1.0
 
 
 class NLPRequest(BaseModel):
@@ -720,45 +734,100 @@ async def resource_allocation(request: AllocationRequest):
         return {"allocations": [], "summary": {"allocated": 0, "unallocated_demand": 0}}
 
     scored_zones = score_zones(request.zones)
-    available = [r for r in request.resources if r.status in ("patrol", "available")]
-    remaining = {z["zone_id"]: z["recommended_units"] for z in scored_zones}
+    
+    # Filter available resources (vehicles) and personnel
+    available_resources = [r for r in request.resources if r.status in ("patrol", "available")]
+    available_personnel = [p for p in (request.personnel or []) if p.status == "available"]
+    busy_personnel = [p for p in (request.personnel or []) if p.status == "busy"]
+    
+    traffic_factor = max(0.7, request.traffic_index * request.road_condition_index)
+    remaining_demand = {z["zone_id"]: z["recommended_units"] for z in scored_zones}
 
     allocations = []
-    used_ids = set()
+    used_resource_ids = set()
+    used_personnel_ids = set()
 
     for zone in scored_zones:
-        if remaining[zone["zone_id"]] <= 0:
+        if remaining_demand[zone["zone_id"]] <= 0:
             continue
 
         z_lat, z_lng = zone_center(zone["zone_id"])
         preferred_family = normalize_need_label(zone.get("dominant_need", "general"))
-        candidates = [r for r in available if r.id not in used_ids]
-        candidates.sort(key=lambda r: (
-            0 if resource_family(r.type, getattr(r, "name", "")) == preferred_family and preferred_family != "general" else 1,
-            haversine_km(r.lat, r.lng, z_lat, z_lng),
-        ))
+        
+        # 1. Primary Assignment: Find Available Personnel + Nearest Resource
+        # We prioritize available personnel who can take a resource and move immediately
+        candidates_p = [p for p in available_personnel if p.id not in used_personnel_ids]
+        candidates_p.sort(key=lambda p: haversine_km(p.lat, p.lng, z_lat, z_lng))
 
-        for resource in candidates[:remaining[zone["zone_id"]]]:
-            distance = haversine_km(resource.lat, resource.lng, z_lat, z_lng)
-            eta_minutes = max(3, int(round(distance / 0.45)))
+        for p in candidates_p:
+            if remaining_demand[zone["zone_id"]] <= 0:
+                break
+                
+            # Find nearest available resource for this personnel
+            candidates_r = [r for r in available_resources if r.id not in used_resource_ids]
+            if not candidates_r:
+                break
+                
+            candidates_r.sort(key=lambda r: (
+                0 if resource_family(r.type, getattr(r, "name", "")) == preferred_family else 1,
+                haversine_km(r.lat, r.lng, p.lat, p.lng) # Resource closest to personnel
+            ))
+            
+            chosen_r = candidates_r[0]
+            distance = haversine_km(p.lat, p.lng, z_lat, z_lng)
+            # Adjusted ETA logic with traffic factor (0.45 km/min is ~27km/h base)
+            eta_minutes = max(3, int(round((distance / (0.45 / traffic_factor)))))
+            
             allocations.append({
                 "zone_id": zone["zone_id"],
-                "resource_id": resource.id,
-                "resource_type": resource.type,
-                "resource_name": resource.name,
-                "resource_family": resource_family(resource.type, resource.name or ""),
-                "preferred_family": preferred_family,
+                "personnel_id": p.id,
+                "personnel_name": p.name,
+                "resource_id": chosen_r.id,
+                "resource_type": chosen_r.type,
+                "resource_name": chosen_r.name,
+                "resource_family": resource_family(chosen_r.type, chosen_r.name or ""),
+                "assignment_type": "primary",
                 "distance_km": round(distance, 2),
                 "eta_minutes": eta_minutes,
                 "urgency_rank": zone["urgency_rank"],
                 "urgency_score": zone["urgency_score"],
             })
-            used_ids.add(resource.id)
-            remaining[zone["zone_id"]] -= 1
-            if remaining[zone["zone_id"]] <= 0:
-                break
+            
+            used_personnel_ids.add(p.id)
+            used_resource_ids.add(chosen_r.id)
+            remaining_demand[zone["zone_id"]] -= 1
 
-    unallocated_demand = sum(v for v in remaining.values() if v > 0)
+        # 2. Queue Assignment: Check Busy Personnel
+        # If demand still exists, check if busy personnel can reach it after current task before SLA expires
+        if remaining_demand[zone["zone_id"]] > 0:
+            candidates_busy = [p for p in busy_personnel if p.id not in used_personnel_ids]
+            
+            for p in candidates_busy:
+                if remaining_demand[zone["zone_id"]] <= 0:
+                    break
+                
+                distance = haversine_km(p.lat, p.lng, z_lat, z_lng)
+                travel_minutes = max(3, int(round((distance / (0.45 / traffic_factor)))))
+                total_wait_minutes = p.current_task_eta_minutes + travel_minutes
+                
+                # Check if this fits within a reasonable window (e.g. 90% of SLA or max 120 mins)
+                # In a real system, we'd compare against incident.sla.targetMinutes
+                if total_wait_minutes < 90: # SLA Threshold heuristic
+                    allocations.append({
+                        "zone_id": zone["zone_id"],
+                        "personnel_id": p.id,
+                        "personnel_name": p.name,
+                        "assignment_type": "queue",
+                        "wait_minutes": total_wait_minutes,
+                        "travel_minutes": travel_minutes,
+                        "current_task_eta": p.current_task_eta_minutes,
+                        "distance_km": round(distance, 2),
+                        "urgency_rank": zone["urgency_rank"],
+                    })
+                    used_personnel_ids.add(p.id)
+                    remaining_demand[zone["zone_id"]] -= 1
+                    
+    unallocated_demand = sum(v for v in remaining_demand.values() if v > 0)
 
     return {
         "allocations": allocations,

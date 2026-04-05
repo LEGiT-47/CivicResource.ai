@@ -1,49 +1,88 @@
 # CivicFlow AI Engine 🧠🏛️
 
-The **CivicFlow AI Engine** is a high-performance, FastAPI-based predictive intelligence service designed to power the next generation of urban management and government operations. It provides real-time analytics, demand forecasting, and automated complaint triage for the CivicResource.ai platform.
+[![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com/)
+[![Scikit-Learn](https://img.shields.io/badge/scikit--learn-F7931E?style=for-the-badge&logo=scikit-learn)](https://scikit-learn.org/)
+[![Status](https://img.shields.io/badge/Status-Operational-success?style=for-the-badge)]()
 
-## 🚀 Core Capabilities
+The **CivicFlow AI Engine** is the predictive "Brain" of the CivicResource.ai platform. It delivers real-time urban analytics, demand forecasting, and automated complaint triage using modern machine learning and NLP protocols.
 
-### 1. Urban Demand Forecasting
-Uses an **ensemble learning model** (Random Forest + Gradient Boosting) to predict infrastructure and service demand across city zones.
-- **Features Analyzed**: Population density, 7-day complaint history, weather (rain/temp), event factors, and historical daily averages.
-- **Outputs**: Urgency scores, predicted demand levels, and recommended resource unit counts per zone.
+---
 
-### 2. Intelligent Complaint Triage
-Automates the classification and validation of citizen reports using Natural Language Processing (NLP).
-- **Categorization**: Automatically sorts reports into `Garbage`, `Water`, `Maintenance`, `Safety`, and `Traffic`.
-- **Integrity Check**: Heuristic and model-based "Fake Score" detection to flag spam or dummy reports.
-- **Multi-language Support**: Basic normalization and keyword extraction for English, Hindi, and Marathi.
+## 🏛️ Core Innovation Pillars
 
-### 3. Dynamic Resource Allocation
-Optimizes the deployment of government resources (Fire, Police, Sanitation, Medical) based on real-time urgency.
-- **Spatial Optimization**: Uses Haversine distance calculations to minimize ETA.
-- **Priority Intelligence**: Matches resource families (e.g., Water Tankers) to specific zonal needs.
+### 1. The Intelligence Matrix (Analysis)
+Combines multi-modal signals into actionable urban insights.
 
-### 4. Tactical Analytics
-- **Hotspot Clustering**: Uses **DBSCAN** to identify geographic clusters of incidents.
-- **Heatmap Generation**: Calculates intensity weights for geospatial visualizations based on incident severity.
+- **Dynamic Demand Forecasting**: An ensemble method blending **Random Forest** and **Gradient Boosting** to predict zonal pressure.
+- **Intelligent Complaint Triage**: NLP-driven classification and "Fake Score" heuristics to validate citizen reports in English, Hindi, and Marathi.
+- **Hotspot Clustering**: Uses **DBSCAN** spatial clustering to identify geographic incident trends.
 
-## 🛠️ Technology Stack
+### 2. The Governance Matrix (Compliance)
+Ensures accountability through automated logic and audit trails.
 
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Asynchronous Python)
-- **Machine Learning**: `scikit-learn` (Random Forest, Gradient Boosting, Logistic Regression)
-- **NLP**: `spaCy` (Language processing and normalization)
-- **Data Handling**: `pandas`, `numpy`
-- **Persistence**: `joblib` for serialized model storage
+- **SLA Efficiency Tracking**: Real-time monitoring of response times against municipal mandates.
+- **Strategic Allocation**: Haversine-optimized resource dispatch with "Need-Matching" technology.
+- **Protocol Integrity**: Automated generation of auditable Protocol IDs for every incident.
 
-## 🛣️ API Endpoints Overview
+---
 
+## 📊 System Architecture
+
+```mermaid
+graph TD
+    subgraph "Citizen Intake"
+        A[Mobile/Web Signal] --> B{AI Intake}
+        B -- "English/Hindi/Marathi" --> C[NLP Normalization]
+    end
+
+    subgraph "Intelligence Matrix"
+        C --> D[Triage Engine]
+        D --> E[Clustering & Hotspots]
+        F[Historical Data] --> G[Demand Forecast Ensemble]
+    end
+
+    subgraph "Governance Matrix"
+        E --> H[Resource Allocation Logic]
+        G --> H
+        H --> I[SLA Flow Monitor]
+        I --> J[Official Protocol Registry]
+    end
+```
+
+---
+
+## 🛣️ API Endpoints
+
+### Urban Analytics (`/analyze/*`)
+| Endpoint | Method | Input | Output |
+| :--- | :--- | :--- | :--- |
+| `/analyze/demand-forecast` | `POST` | Zonal features | Urgency scores & Forecasts |
+| `/analyze/complaint-intake` | `POST` | Raw text | Intent detection & Relability |
+| `/analyze/resource-allocation`| `POST` | Units + Demands | Optimal Dispatch Plan |
+| `/analyze/clustering` | `POST` | Incident list | Geographic Hotspots |
+| `/analyze/heatmap-weights` | `POST` | Incident list | Mapping intensity weights |
+
+### Model Lifecycle (`/model/*`)
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
-| `/analyze/demand-forecast` | `POST` | Predicts demand and urgency for a list of urban zones. |
-| `/analyze/complaint-intake` | `POST` | Triages a report: predicts type, extracts keywords, and scores reliability. |
-| `/analyze/resource-allocation`| `POST` | Recommends the best dispatch plan for available units. |
-| `/analyze/clustering` | `POST` | Identifies incident hotspots using spatial clustering. |
-| `/model/status` | `GET` | Returns current training metrics and model metadata. |
-| `/model/train` | `POST` | Retrains demand models using the latest historical data. |
+| `/model/status` | `GET` | Retrieve demand model training metrics. |
+| `/model/triage-status` | `GET` | Retrieve triage model training metrics. |
+| `/model/train` | `POST` | Retrain demand models from latest CSV. |
+| `/model/train-triage` | `POST` | Retrain triage models from latest CSV. |
 
-## 📦 Setup & Installation
+---
+
+## 🛠️ Data Integrity & Scripts
+
+The engine includes a suite of verification and training tools:
+
+- **`generate_data.py`**: Synthetic dataset generator for historical demand and triage scenarios.
+- **`verify_data.py`**: *(New)* Data integrity and model verification script for high-confidence deployments.
+- **`scripts/train_with_open_data.py`**: Pipeline for bootstrapping models with public municipal datasets.
+
+---
+
+## 🚀 Setup & Execution
 
 1. **Install Dependencies**:
    ```bash
@@ -54,25 +93,13 @@ Optimizes the deployment of government resources (Fire, Police, Sanitation, Medi
    ```bash
    python main.py
    ```
-   The engine will start on `http://localhost:8000`.
+   *Starts on [http://localhost:8000](http://localhost:8000)*
 
-3. **Bootstrap Models**:
-   On the first run, if pre-trained models (`.joblib` files) are not found in the `models/` directory, the engine will automatically train them using the datasets in `data/`.
-
-## 📊 Data Structures
-
-### Demand Prediction Features
-- `population_density`: People per sq km.
-- `complaints_last_7d`: Rolling count of local reports.
-- `weather_rain_mm`: Precipitation impact.
-- `event_factor`: Multiplier based on local festivals or public gatherings.
-
-### Resource Families
-The engine maps heterogeneous units into unified "Needs" categories:
-- **Garbage**: Trash trucks, sanitation inspectors.
-- **Water**: Tankers, plumbing teams.
-- **Maintenance**: Road repair, electrical crews.
-- **Safety**: Police, Fire, Emergency services.
+3. **Retrain Models**:
+   ```bash
+   curl -X POST http://localhost:8000/model/train
+   curl -X POST http://localhost:8000/model/train-triage
+   ```
 
 ---
-*Built with ❤️ for Civic Excellence.*
+*Built for Civic Excellence & Modern Urban Governance.*

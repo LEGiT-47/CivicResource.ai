@@ -1,152 +1,92 @@
-# CivicResource.ai
+# CivicResource.ai 🏛️🧠
 
-CivicResource.ai is an AI-assisted civic operations platform that connects complaint intake, dispatch intelligence, and field execution in one operational flow.
+**CivicResource.ai** is an AI-assisted civic operations platform that connects complaint intake, dispatch intelligence, and field execution in one operational flow.
 
-It combines:
+---
 
-1. A web command system for admins and dispatch teams.
-2. A worker operational HUD for route execution and status updates.
-3. A mobile app for citizen reporting and field use cases.
-4. A Python AI engine for triage, demand forecasting, and allocation support.
+## 🏛️ Core Innovation Pillars
 
-## Problem It Solves
+### 1. The Intelligence Matrix (Analysis)
+Combines multi-modal signals into actionable urban insights.
 
-City response teams often work with delayed updates, fragmented tools, and no shared real-time field context. This platform unifies the lifecycle:
+- **Dynamic Demand Forecasting**: Predicts zonal pressure using ensemble-learning.
+- **Intelligent Complaint Triage**: NLP-driven validation of citizen reports in English, Hindi, and Marathi.
+- **Hotspot Clustering**: Identifies geographic incident trends using DBSCAN.
 
-1. Complaint is reported.
-2. Incident is triaged and validated.
-3. Dispatch allocates the right responder.
-4. Worker route and progress are tracked live.
-5. Resolution and learning feedback update future decisions.
+### 2. The Governance Matrix (Compliance)
+Ensures accountability through automated logic and audit trails.
 
-## Major Capabilities
+- **SLA Efficiency Tracking**: Monitors response times against municipal mandates.
+- **Strategic Allocation**: Haversine-optimized resource dispatch with "Need-Matching."
+- **Protocol Integrity**: Auditable Protocol IDs for every urban incident.
 
-### Complaint Intake and Trust
+---
 
-1. Multilingual complaint intake with normalization support.
-2. AI-assisted complaint triage and civic relevance checks.
-3. Trust score and verification mode assignment.
-4. Duplicate/fusion clustering for repeated reports.
-5. Public tracking via phone or tracking ID.
+## 🚀 System Architecture
 
-### AI and Optimization
+```mermaid
+graph TD
+    subgraph "Citizen Induction"
+        A[Mobile/Web Signal] --> B{AI Intake}
+        B -- "English/Hindi/Marathi" --> C[NLP Normalization]
+    end
 
-1. Demand forecasting and zone urgency scoring.
-2. Crisis mode templates (normal, flood, festival, strike, heatwave).
-3. Explainable allocation suggestions with scoring factors.
-4. Freshness-aware demand weighting so new incidents are prioritized.
-5. Open-data training pipeline using civic datasets.
+    subgraph "Platform Architecture"
+        C --> D[Intelligence Matrix]
+        D --> E[Command Center HUD]
+        E --> F[Governance Matrix]
+        F --> G[Dispatch Relay]
+        G --> H[Worker Journey HUD]
+    end
+```
 
-### Dispatch and Operations
+---
 
-1. Live dispatch panel with dynamic apply-plan flow.
-2. Smart fallback recommendations when AI plan is temporarily empty.
-3. Assignment history preserved after resolution.
-4. Worker-specific assignment feeds.
-5. Operator copilot command endpoint for quick decision support.
+## 🛣️ Major Capabilities
 
-### Live Worker Journey Simulation
+### 📋 Complaint Intake & Trust
+- **Multilingual Intake**: Normalizes reports in English, Hindi, and Marathi.
+- **Trust Scoring**: AI-assisted triage and civic relevance checks.
+- **Duplicate Fusion**: Clustering repeated reports into a single actionable signal.
 
-1. Scripted route lifecycle: accept, en-route, on-site, resolving, return.
-2. Shared tracking telemetry (path, events, current location) stored on incidents.
-3. Same tracking path rendered on worker and admin strategic maps.
-4. Countdown ETA in mm:ss format with seconds-level updates.
-5. Outbound ETA starts with a planned value between 11 and 20 minutes by default.
-6. If worker marks resolved early, simulation fast-forwards to completion and releases unit.
+### 🧠 AI & Optimization
+- **Demand Forecasting**: Zone urgency scoring and crisis mode templates (Flood, Festival, Strike, Heatwave).
+- **Explainable Allocation**: Suggestions with scoring factors for transparent decision support.
 
-## Tech Stack
+### ⚡ Dispatch & Operations
+- **Live Dispatch Panel**: Dynamic "Apply-Plan" flow with smart fallback recommendations.
+- **Worker Journey Simulation**: Real-time tracking of route lifecycle (En-route, On-site, Resolved).
+- **ETA Countdown**: Precise mm:ss updates synced across Worker and Admin maps.
 
-### Client (Web)
+---
 
-1. React 18
-2. TypeScript
-3. Vite
-4. Tailwind CSS
-5. Framer Motion
-6. React Leaflet
+## 🛠️ Tech Stack & Layout
 
-### Server
+### Technology Stack
+- **Client**: React 18, Vite, Tailwind CSS, Framer Motion, React Leaflet.
+- **Server**: Node.js, Express, MongoDB + Mongoose, JWT Auth.
+- **AI Engine**: FastAPI, Scikit-Learn Ensemble, NLP (SpaCy).
+- **Mobile**: Expo, React Native.
 
-1. Node.js
-2. Express
-3. MongoDB + Mongoose
-4. JWT authentication
+### Repository Layout
+- **`client/`**: Web UI and operational dashboards.
+- **`server/`**: API routes, business logic, and simulation scripts.
+- **`ai-engine/`**: AI services, training scripts, and model assets.
+- **`mobile-app/`**: Workflows for citizen and field usage.
 
-### AI Engine
+---
 
-1. FastAPI
-2. scikit-learn-based triage and demand services
+## 🚀 Local Setup
 
-### Mobile App
+1. **Install Dependencies**:
+   - `server/`: `npm install`
+   - `client/`: `npm install`
+   - `ai-engine/`: `pip install -r requirements.txt`
 
-1. Expo
-2. React Native
-3. TypeScript
+2. **Run Services**:
+   - `server/`: `npm run dev`
+   - `client/`: `npm run dev`
+   - `ai-engine/`: `uvicorn main:app --reload --port 8000`
 
-## Repository Layout
-
-1. client: web UI and operational dashboards
-2. server: API routes, business logic, simulation scripts, seeders
-3. ai-engine: AI services, training scripts, and model assets
-4. mobile-app: mobile workflows for citizen and field usage
-5. prd.md: product requirements and system goals
-
-## Local Setup
-
-### Prerequisites
-
-1. Node.js 18+
-2. Python 3.10+
-3. MongoDB
-
-### Install Dependencies
-
-1. In server: npm install
-2. In client: npm install
-3. In mobile-app: npm install
-4. In ai-engine: pip install -r requirements.txt
-
-### Run Services
-
-Use separate terminals:
-
-1. server: npm run dev
-2. client: npm run dev
-3. ai-engine: uvicorn main:app --reload --port 8000
-4. mobile-app (optional): npm run start
-
-### Seed Demo Data
-
-1. In server: npm run seed
-2. Seed includes admin/operator/worker accounts, personnel, incidents, and resources.
-
-## Demo Flow (Judge Friendly)
-
-1. Log in as admin and create a fresh complaint.
-2. Assign responder from dispatch.
-3. Confirm incident is assigned but not yet moving.
-4. Log in as worker and click Initialize Route.
-5. Show mm:ss ETA countdown and moving unit on worker HUD.
-6. Show the same unit path and phase on admin strategic map.
-7. Mark incident resolved from worker view to trigger fast completion.
-8. Confirm dispatch status completed and responder returned to available.
-
-## API Highlights
-
-1. POST /api/incidents: create incident
-2. PUT /api/incidents/:id/status: status transitions and resolution handling
-3. POST /api/dispatch/assign: manual responder assignment
-4. POST /api/dispatch/apply-plan-live: dynamic live dispatch application
-5. POST /api/dispatch/start-journey-simulation: worker route simulation start
-6. GET /api/dispatch/my-assignments: worker live assignments
-7. GET /api/dispatch/personnel?all=true: admin personnel view with live incident tracking
-
-## Notes
-
-1. For demo consistency, reseed before major presentations.
-2. Use two browser sessions: one admin, one worker.
-3. The worker and admin maps now consume shared tracking telemetry for route sync.
-
-## License
-
-Internal project and competition usage unless specified otherwise.
+---
+*Built for Civic Excellence & Modern Urban Governance.*

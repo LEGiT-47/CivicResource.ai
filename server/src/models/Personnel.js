@@ -24,6 +24,16 @@ const personnelSchema = mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Incident',
     },
+    assignedResource: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Resource',
+    },
+    taskQueue: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Incident',
+      },
+    ],
     contact: {
       phone: { type: String },
       unitId: { type: String, required: true, unique: true },

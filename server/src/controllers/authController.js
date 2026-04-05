@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import Personnel from '../models/Personnel.js';
 import generateToken from '../utils/generateToken.js';
 
 // @desc    Auth user & get token
@@ -33,7 +34,7 @@ export const authUser = async (req, res, next) => {
 // @access  Public
 export const registerUser = async (req, res, next) => {
   try {
-    const { name, email, password, organization, role } = req.body;
+    const { name, email, password, organization, role, department } = req.body;
     const userExists = await User.findOne({ email });
 
     if (userExists) {
@@ -45,17 +46,37 @@ export const registerUser = async (req, res, next) => {
       name,
       email,
       password,
-      organization: organization || 'City Government',
+      organization: organization || 'CivicResource.ai Registry',
       role: role || 'operator',
+      department: role === 'responder' ? (department || 'utility') : undefined,
     });
 
     if (user) {
+      // If responder, create matching Personnel entry
+      if (user.role === 'responder') {
+        const personnelCount = await Personnel.countDocuments();
+        const nextId = personnelCount + 1;
+        const unitId = `STAFF-${String(nextId).padStart(2, '0')}`;
+        
+        await Personnel.create({
+          name: user.name,
+          type: department || 'utility',
+          status: 'available',
+          location: { lat: 19.0760, lng: 72.8777 }, // Default Mumbai Center
+          contact: { unitId },
+        });
+
+        user.unitId = unitId;
+        await user.save();
+      }
+
       res.status(201).json({
         _id: user._id,
         name: user.name,
         email: user.email,
         organization: user.organization,
         role: user.role,
+        unitId: user.unitId || null,
         token: generateToken(user._id),
       });
     } else {

@@ -633,10 +633,41 @@ export const updateIncidentStatus = async (req, res, next) => {
         const uniquePersonnelIds = [...new Set(personnelIds)].filter(Boolean);
 
         if (uniquePersonnelIds.length > 0) {
-          await Personnel.updateMany(
-            { _id: { $in: uniquePersonnelIds } },
-            { $set: { status: 'available', currentIncident: null } }
-          );
+          for (const personnelId of uniquePersonnelIds) {
+            const personnel = await Personnel.findById(personnelId);
+            if (personnel) {
+              if (personnel.taskQueue && personnel.taskQueue.length > 0) {
+                // Pop from queue and assign as current
+                const nextIncidentId = personnel.taskQueue.shift();
+                personnel.currentIncident = nextIncidentId;
+                personnel.status = 'busy'; // Remains busy
+                await personnel.save();
+
+                // Update the next incident to be dispatched
+                const nextIncident = await Incident.findById(nextIncidentId);
+                if (nextIncident) {
+                  nextIncident.assignedPersonnel = personnel._id;
+                  nextIncident.dispatchStatus = 'dispatched';
+                  if (personnel.assignedResource) {
+                    nextIncident.assignedResources = [personnel.assignedResource];
+                  }
+                  await nextIncident.save();
+                }
+              } else {
+                personnel.status = 'available';
+                personnel.currentIncident = null;
+                // Resource also becomes available if no more tasks
+                if (personnel.assignedResource) {
+                  await Resource.findByIdAndUpdate(personnel.assignedResource, { 
+                    status: 'available', 
+                    currentIncident: null,
+                    assignedPersonnel: null 
+                  });
+                }
+                await personnel.save();
+              }
+            }
+          }
         }
       }
 

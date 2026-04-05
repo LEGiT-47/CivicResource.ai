@@ -17,15 +17,17 @@ export default function DispatchSystem() {
         const [aiPulse, setAiPulse] = useState<any | null>(null);
         const [isApplyingPlan, setIsApplyingPlan] = useState(false);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
+  const [selectedPersonnelIds, setSelectedPersonnelIds] = useState<string[]>([]);
   const [isDispatching, setIsDispatching] = useState(false);
-    const [incidentSearch, setIncidentSearch] = useState("");
-        const [resourceFilter, setResourceFilter] = useState<"All" | "Garbage" | "Water" | "Maintenance" | "Public Works">("All");
+  const [isAddingResource, setIsAddingResource] = useState(false);
+  const [newResource, setNewResource] = useState({ name: "", type: "utility", lat: 19.0760, lng: 72.8777 });
+  const [incidentSearch, setIncidentSearch] = useState("");
+  
+  const user = JSON.parse(localStorage.getItem("CivicResource_user") || "{}");
+  const isAdmin = user.role === "admin";
+    const [resourceFilter, setResourceFilter] = useState<"All" | "Utility" | "Sanitation" | "Police" | "Fire" | "Medical">("All");
         const [showResourceDrawer, setShowResourceDrawer] = useState(false);
-        const operationalResources = resources.filter((r) => {
-            const name = String(r.name || "").toLowerCase();
-            const type = String(r.type || "").toLowerCase();
-            return type === "public_works" || name.includes("garbage") || name.includes("water") || name.includes("maintenance") || name.includes("repair");
-        });
+        const operationalResources = resources.filter((r) => r.status !== "offline");
 
     const fetchData = async () => {
         try {
@@ -89,20 +91,48 @@ export default function DispatchSystem() {
         toast.success(`Dispatch protocol aborted for: ${abortedTitle}`);
     };
 
-    const handleResourceDispatch = async (resourceId: string, targetIncidentId?: string) => {
-        const incidentId = targetIncidentId || selectedIncident?._id;
-        if (!incidentId) {
-            toast.error("Select an incident to dispatch a resource");
+    const handleDispatch = async (resourceId?: string) => {
+        if (!selectedIncident?._id || selectedPersonnelIds.length === 0) {
+            toast.error("Select an incident and at least one worker");
+            return;
+        }
+
+        setIsDispatching(true);
+        try {
+            const { data } = await api.post('/dispatch/assign', { 
+                incidentId: selectedIncident._id, 
+                personnelIds: selectedPersonnelIds,
+                resourceId 
+            });
+            toast.success(data.message || "Dispatch successful");
+            setSelectedPersonnelIds([]);
+            fetchData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "Dispatch failed");
+            console.error(err);
+        } finally {
+            setIsDispatching(false);
+        }
+    };
+
+    const handleAddResource = async () => {
+        if (!newResource.name) {
+            toast.error("Resource name required");
             return;
         }
 
         try {
-            await api.put(`/resources/${resourceId}/dispatch`, { incidentId });
-            toast.success("Resource dispatched to selected incident");
+            await api.post('/resources', {
+                name: newResource.name,
+                type: newResource.type,
+                location: { lat: newResource.lat, lng: newResource.lng }
+            });
+            toast.success(`${newResource.name} inducted into fleet`);
+            setIsAddingResource(false);
+            setNewResource({ name: "", type: "utility", lat: 19.0760, lng: 72.8777 });
             fetchData();
         } catch (err) {
-            toast.error("Resource dispatch failed");
-            console.error(err);
+            toast.error("Failed to induct resource");
         }
     };
 
@@ -364,12 +394,8 @@ export default function DispatchSystem() {
 
     const filteredResources = operationalResources.filter((r) => {
         if (resourceFilter === "All") return true;
-        const name = String(r.name || "").toLowerCase();
         const type = String(r.type || "").toLowerCase();
-        if (resourceFilter === "Garbage") return name.includes("garbage") || name.includes("trash");
-        if (resourceFilter === "Water") return name.includes("water") || name.includes("tanker");
-        if (resourceFilter === "Maintenance") return name.includes("maintenance") || name.includes("repair");
-        return type === "public_works";
+        return type === resourceFilter.toLowerCase();
     });
 
     const typeMatchedResources = filteredResources;
@@ -390,10 +416,10 @@ export default function DispatchSystem() {
                 </div>
 
                 <div className="flex gap-2">
-                    {['All', 'Garbage', 'Water', 'Maintenance', 'Public Works'].map(cat => (
+                    {['All', 'Utility', 'Sanitation', 'Police', 'Fire', 'Medical'].map(cat => (
                         <button
                             key={cat}
-                            onClick={() => setResourceFilter(cat as "All" | "Garbage" | "Water" | "Maintenance" | "Public Works")}
+                            onClick={() => setResourceFilter(cat as any)}
                             className={cn(
                                 "flex-1 py-3 items-center rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all",
                                 resourceFilter === cat ? "border-primary/40 text-white bg-primary/10" : "border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
@@ -405,44 +431,178 @@ export default function DispatchSystem() {
                 </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-3 custom-scrollbar">
-                {typeMatchedResources.map((r) => (
-                    <div
-                        key={r._id}
-                        className="group bg-slate-800/40 border border-slate-800 p-5 rounded-2xl hover:bg-slate-800 hover:border-slate-700 transition-all relative overflow-hidden"
-                    >
-                        <div className="flex items-center justify-between relative z-10">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-700 flex items-center justify-center">
-                                    <Truck className="w-6 h-6 text-slate-400 group-hover:text-primary transition-colors" />
-                                </div>
-                                <div>
-                                    <h4 className="text-xs font-black text-white uppercase tracking-tight">{r.name}</h4>
-                                    <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{r.type?.replace('_', ' ') || 'resource'} • {r.status}</span>
-                                </div>
-                            </div>
-
-                            <button
-                                disabled={!selectedIncident || isDispatching}
-                                onClick={() => handleResourceDispatch(r._id)}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
+                <div>
+                   <div className="flex items-center justify-between mb-4">
+                      <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Step 1: Select Personnel</h4>
+                      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">{personnel.length} Units Online</span>
+                   </div>
+                   <div className="space-y-2">
+                       {personnel
+                        .sort((a, b) => {
+                           if (a.status === 'off-duty' && b.status !== 'off-duty') return 1;
+                           if (a.status !== 'off-duty' && b.status === 'off-duty') return -1;
+                           return 0;
+                        })
+                        .map(p => {
+                          const isSelected = selectedPersonnelIds.includes(p._id);
+                          const isOffDuty = p.status === 'off-duty';
+                          
+                          return (
+                             <div 
+                                key={p._id}
+                                onClick={() => {
+                                   if (isSelected) {
+                                      setSelectedPersonnelIds(prev => prev.filter(id => id !== p._id));
+                                   } else {
+                                      setSelectedPersonnelIds(prev => [...prev, p._id]);
+                                   }
+                                }}
                                 className={cn(
-                                    "px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
-                                    selectedIncident
-                                        ? "bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 active:scale-95"
-                                        : "bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700"
+                                   "p-4 rounded-xl border cursor-pointer transition-all relative overflow-hidden",
+                                   isSelected 
+                                      ? "bg-primary border-primary text-white shadow-xl shadow-primary/20" 
+                                      : isOffDuty 
+                                         ? "bg-slate-900/40 border-transparent opacity-50 grayscale select-none"
+                                         : "bg-slate-800/40 border-slate-800 text-slate-400 hover:border-slate-700"
                                 )}
+                             >
+                                <div className="flex items-center justify-between relative z-10">
+                                   <div>
+                                      <p className={cn(
+                                         "text-[11px] font-black uppercase tracking-tight",
+                                         isOffDuty && "text-slate-500"
+                                      )}>{p.name}</p>
+                                      <div className="flex items-center gap-2 mt-1">
+                                         <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-white/10 text-white/60 border border-white/5">
+                                            {p.type}
+                                         </span>
+                                         {p.taskQueue?.length > 0 && (
+                                            <span className="text-[8px] font-black uppercase text-amber-400">
+                                               {p.taskQueue.length} Queued
+                                            </span>
+                                         )}
+                                      </div>
+                                   </div>
+                                   <div className="flex items-center gap-3">
+                                      <span className={cn(
+                                         "text-[7px] font-black uppercase px-1.5 py-0.5 rounded-full border",
+                                         p.status === 'available' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : 
+                                         isOffDuty ? "bg-slate-700/20 border-slate-700/30 text-slate-500" :
+                                         "bg-amber-500/10 border-amber-500/20 text-amber-500"
+                                      )}>
+                                         {p.status}
+                                      </span>
+                                      {isSelected && <CheckCircle className="w-3 h-3 text-white" />}
+                                   </div>
+                                </div>
+                             </div>
+                          );
+                        })}
+                   </div>
+                </div>
+
+                {selectedPersonnelIds.length > 0 && (
+                   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+                      <div className="flex items-center justify-between mb-4">
+                         <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Step 2: Select Resource</h4>
+                         {isAdmin && (
+                            <button 
+                               onClick={() => setIsAddingResource(true)}
+                               className="text-[8px] font-black text-primary uppercase tracking-[0.2em] hover:underline"
                             >
-                                Dispatch
+                               + Induct New Asset
                             </button>
-                        </div>
-                    </div>
-                ))}
-                {selectedIncident && typeMatchedResources.length === 0 && (
-                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/10 text-amber-200 text-xs font-bold uppercase tracking-wider">
-                        No available resources right now.
-                    </div>
+                         )}
+                      </div>
+                      
+                      {isAddingResource && (
+                         <div className="mb-6 p-5 rounded-2xl bg-white/5 border border-white/10 space-y-4">
+                            {/* ... (Keep induction inputs) ... */}
+                            <div className="space-y-2">
+                               <label className="text-[8px] font-black text-slate-500 uppercase tracking-widest ml-1">Asset Designation</label>
+                               <input 
+                                  value={newResource.name}
+                                  onChange={e => setNewResource({...newResource, name: e.target.value})}
+                                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-[10px] font-bold text-white uppercase tracking-widest placeholder:text-slate-700" 
+                                  placeholder="e.g. RAPID_RESPONSE_01"
+                               />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                               <select 
+                                  value={newResource.type}
+                                  onChange={e => setNewResource({...newResource, type: e.target.value})}
+                                  className="bg-slate-900 border border-slate-700 rounded-xl px-3 py-3 text-[9px] font-black text-white uppercase tracking-widest outline-none"
+                               >
+                                  <option value="utility">Utility</option>
+                                  <option value="sanitation">Sanitation</option>
+                                  <option value="medical">Medical</option>
+                                  <option value="fire">Fire</option>
+                                  <option value="police">Police</option>
+                               </select>
+                               <button 
+                                  onClick={handleAddResource}
+                                  className="bg-primary text-white text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20"
+                               >
+                                  Induct
+                               </button>
+                            </div>
+                            <button onClick={() => setIsAddingResource(false)} className="w-full text-center text-[8px] font-black text-slate-600 uppercase tracking-widest">Cancel</button>
+                         </div>
+                      )}
+
+                      <div className="space-y-3">
+                          {typeMatchedResources.map((r) => (
+                             <div
+                                 key={r._id}
+                                 className="group bg-slate-800/40 border border-slate-800 p-5 rounded-2xl hover:bg-slate-800 hover:border-slate-700 transition-all"
+                             >
+                                 <div className="flex items-center justify-between">
+                                     <div className="flex items-center gap-4">
+                                         <div className="w-10 h-10 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center">
+                                             <Truck className="w-5 h-5 text-slate-400 group-hover:text-primary transition-colors" />
+                                         </div>
+                                         <div>
+                                             <h4 className="text-xs font-black text-white uppercase tracking-tight">{r.name}</h4>
+                                             <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{r.status}</span>
+                                         </div>
+                                     </div>
+
+                                     <button
+                                         disabled={!selectedIncident || selectedPersonnelIds.length === 0 || isDispatching}
+                                         onClick={() => handleDispatch(r._id)}
+                                         className={cn(
+                                             "px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all",
+                                             selectedIncident && selectedPersonnelIds.length > 0
+                                                 ? "bg-primary text-white shadow-xl shadow-primary/20 hover:scale-105 active:scale-95"
+                                                 : "bg-slate-800 text-slate-600 cursor-not-allowed border border-slate-700"
+                                         )}
+                                     >
+                                         Dispatch Team
+                                     </button>
+                                 </div>
+                             </div>
+                         ))}
+                      </div>
+                      
+                      {typeMatchedResources.length === 0 && (
+                         <button
+                             onClick={() => handleDispatch()}
+                             className="w-full mt-4 py-4 bg-slate-800 border border-slate-700 rounded-2xl text-[10px] font-black uppercase text-white tracking-widest hover:bg-slate-700"
+                         >
+                             Dispatch Personnel Only
+                         </button>
+                      )}
+                   </motion.div>
                 )}
             </div>
+
+            {!selectedPersonnelIds.length && (
+               <div className="mt-auto p-12 border-t border-slate-800 flex flex-col items-center justify-center text-center opacity-40">
+                  <Activity className="w-12 h-12 text-slate-600 mb-4" />
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Pick workers to unlock equipment matrix</p>
+               </div>
+            )}
 
             <div className="p-8 border-t border-slate-800 bg-slate-900/50">
                 <div className="flex items-center justify-between text-slate-500 uppercase font-black text-[9px] tracking-widest mb-6 px-2">
@@ -640,11 +800,11 @@ export default function DispatchSystem() {
                                                 )}
                                             </div>
                                             <button
-                                                onClick={() => handleResourceDispatch(s.resource._id, s.incident._id)}
-                                                disabled={String(s.resource?.type || '').toLowerCase() === 'pending'}
+                                                onClick={() => handleDispatch(s.personnel_id, s.resource_id, s.incident._id)}
+                                                disabled={String(s.resource_type || '').toLowerCase() === 'pending'}
                                                 className="px-3 py-2 rounded-lg border border-border/40 text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-primary hover:text-primary transition-all"
                                             >
-                                                {String(s.resource?.type || '').toLowerCase() === 'pending' ? 'Queued' : 'Apply'}
+                                                {s.assignment_type === 'queue' ? 'Queue' : 'Apply'}
                                             </button>
                                         </div>
                                     ))}
@@ -694,7 +854,10 @@ export default function DispatchSystem() {
                                                 </td>
                                                 <td className="py-3 pr-4">
                                                     <button
-                                                        onClick={() => handleResourceDispatch(r._id)}
+                                                        onClick={() => {
+                                                            setSelectedPersonnel(personnel[0]); // Mock selection for quick send
+                                                            handleDispatch(personnel[0]?._id, r._id);
+                                                        }}
                                                         disabled={!selectedIncident || isDispatching || r.status === 'dispatched'}
                                                         className="px-3 py-2 rounded-lg border border-border/40 text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-primary hover:text-primary transition-all disabled:opacity-50"
                                                     >

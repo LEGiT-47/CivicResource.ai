@@ -348,57 +348,123 @@ const postAI = async (endpoint, payload) => {
   return response.json();
 };
 
-// @desc    Dispatch personnel to an incident
+// @desc    Dispatch personnel to an incident with a resource
 // @route   POST /api/dispatch/assign
 // @access  Private (Officer)
 export const assignPersonnel = async (req, res) => {
-  const { incidentId, personnelId } = req.body;
+  const { incidentId, personnelId, personnelIds, resourceId } = req.body;
+  const idsToProcess = Array.isArray(personnelIds) ? personnelIds : (personnelId ? [personnelId] : []);
+
+  if (!incidentId || idsToProcess.length === 0) {
+    return res.status(400).json({ message: 'Incident and Personnel selection required' });
+  }
 
   try {
     const incident = await Incident.findById(incidentId);
-    const personnel = await Personnel.findById(personnelId);
-
-    if (!incident || !personnel) {
-      return res.status(404).json({ message: 'Incident or Personnel not found' });
+    if (!incident) {
+      return res.status(404).json({ message: 'Incident not found' });
     }
 
-    if (personnel.status !== 'available') {
-      return res.status(400).json({ message: 'Personnel is already busy or off-duty' });
-    }
+    let resource = resourceId ? await Resource.findById(resourceId) : null;
+    const results = [];
 
-    // Assign current primary responder; keep historical list separately.
-    if (!incident.assignedPersonnel || incident.status === 'resolved' || incident.dispatchStatus === 'completed') {
-      incident.assignedPersonnel = personnelId;
-    }
+    for (const pId of idsToProcess) {
+      const personnel = await Personnel.findById(pId);
+      if (!personnel) continue;
 
-    const assignedList = (incident.assignedPersonnelList || []).map((id) => String(id));
-    if (!assignedList.includes(String(personnelId))) {
-      incident.assignedPersonnelList = [...(incident.assignedPersonnelList || []), personnelId];
+      // Handle Queuing if busy
+      if (personnel.status === 'busy') {
+        if (!personnel.taskQueue.includes(incidentId) && personnel.taskQueue.length < 5) {
+          personnel.taskQueue.push(incidentId);
+          await personnel.save();
+          results.push({ id: pId, status: 'queued' });
+        }
+        continue;
+      }
+
+      if (personnel.status === 'off-duty') {
+        results.push({ id: pId, status: 'skipped_off_duty' });
+        continue;
+      }
+
+      // Live Dispatch
+      const finalResource = resource || (personnel.assignedResource ? await Resource.findById(personnel.assignedResource) : null);
+      
+      personnel.status = 'busy';
+      personnel.currentIncident = incidentId;
+      if (finalResource) {
+        personnel.assignedResource = finalResource._id;
+        finalResource.status = 'dispatched';
+        finalResource.assignedPersonnel = pId;
+        finalResource.currentIncident = incidentId;
+        await finalResource.save();
+      }
+      await personnel.save();
+
+      // Update Incident
+      if (!incident.assignedPersonnel) incident.assignedPersonnel = pId;
+      const assignedList = (incident.assignedPersonnelList || []).map(id => String(id));
+      if (!assignedList.includes(String(pId))) {
+        incident.assignedPersonnelList.push(pId);
+      }
+      results.push({ id: pId, status: 'dispatched' });
     }
 
     incident.dispatchStatus = 'dispatched';
-    if (incident.status === 'resolved') {
-      incident.status = 'active';
-    }
-    incident.workflow = incident.workflow || {};
-    if (!incident.workflow.allocatedAt) {
-      incident.workflow.allocatedAt = new Date();
-    }
-    if (!incident.workflow.enRouteAt) {
-      incident.workflow.enRouteAt = new Date();
+    if (resourceId && !incident.assignedResources.includes(resourceId)) {
+      incident.assignedResources.push(resourceId);
     }
     
-    personnel.status = 'busy';
-    personnel.currentIncident = incidentId;
-
+    incident.workflow = incident.workflow || {};
+    if (!incident.workflow.allocatedAt) incident.workflow.allocatedAt = new Date();
+    if (!incident.workflow.enRouteAt) incident.workflow.enRouteAt = new Date();
+    
     await incident.save();
-    await personnel.save();
 
     res.status(200).json({
-      message: 'Personnel dispatched successfully',
-      incident,
-      personnel
+      message: `Processed ${idsToProcess.length} personnel for dispatch`,
+      results,
+      incident
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Worker rejects a queued task
+// @route   POST /api/dispatch/reject-task
+// @access  Private (Worker)
+export const rejectTask = async (req, res) => {
+  const { incidentId, reason } = req.body;
+  const unitId = req.user?.unitId;
+
+  try {
+    const personnel = await Personnel.findOne({ 'contact.unitId': unitId });
+    if (!personnel) {
+      return res.status(404).json({ message: 'Personnel not found' });
+    }
+
+    // Remove from queue
+    personnel.taskQueue = (personnel.taskQueue || []).filter(id => String(id) !== String(incidentId));
+    
+    // If it was the current incident (unlikely but possible if they want to drop current)
+    if (String(personnel.currentIncident) === String(incidentId)) {
+      personnel.currentIncident = null;
+      personnel.status = personnel.taskQueue.length > 0 ? 'busy' : 'available';
+    }
+
+    await personnel.save();
+
+    // Update incident to be unassigned
+    const incident = await Incident.findById(incidentId);
+    if (incident) {
+      incident.assignedPersonnel = null;
+      incident.dispatchStatus = 'unassigned';
+      incident.assignedPersonnelList = (incident.assignedPersonnelList || []).filter(id => String(id) !== String(personnel._id));
+      await incident.save();
+    }
+
+    res.status(200).json({ message: 'Task rejected successfully', personnel });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -656,7 +722,22 @@ export const getAIAnalysis = async (req, res) => {
       postAI('/analyze/clustering', { incidents: payloadIncidents }),
       postAI('/analyze/heatmap-weights', { incidents: payloadIncidents }),
       postAI('/analyze/demand-forecast', { zones }),
-      postAI('/analyze/resource-allocation', { zones, resources: payloadResources }),
+      postAI('/analyze/resource-allocation', { 
+        zones, 
+        resources: payloadResources,
+        personnel: (await Personnel.find({})).map(p => ({
+          id: String(p._id),
+          name: p.name,
+          type: p.type,
+          status: p.status,
+          lat: safeNumber(p.location?.lat, 19.076),
+          lng: safeNumber(p.location?.lng, 72.8777),
+          current_task_eta_minutes: 15, // Mock current task ETA
+          assigned_resource_id: p.assignedResource ? String(p.assignedResource) : null
+        })),
+        traffic_index: liveInputs.traffic_index,
+        road_condition_index: liveInputs.road_condition_index
+      }),
     ]);
 
     const zoneById = new Map((demandResp?.zones || []).map((zone) => [String(zone.zone_id), zone]));

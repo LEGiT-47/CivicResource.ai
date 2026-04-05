@@ -179,7 +179,9 @@ function TacticalWorkerMap({
 export default function DriverHUD() {
   const [activeIncident, setActiveIncident] = useState<any>(null);
   const [incidents, setIncidents] = useState<any[]>([]);
-   const [incidentFilter, setIncidentFilter] = useState("");
+  const [taskQueue, setTaskQueue] = useState<any[]>([]);
+  const [assignedResource, setAssignedResource] = useState<any>(null);
+  const [incidentFilter, setIncidentFilter] = useState("");
   const [loading, setLoading] = useState(true);
    const [isRouting, setIsRouting] = useState(false);
    const [isCompleting, setIsCompleting] = useState(false);
@@ -193,9 +195,18 @@ export default function DriverHUD() {
 
    const refreshAssignments = async () => {
       let data: any[] = [];
+      let personnelInfo: any = null;
       try {
          const resp = await api.get('/dispatch/my-assignments');
          data = resp.data || [];
+         
+         // Fetch personnel specific info for queue and resource
+         const userStr = localStorage.getItem('CivicResource_user') || localStorage.getItem('CivicFlow_user');
+         const user = userStr ? JSON.parse(userStr) : null;
+         if (user?.unitId) {
+            const pResp = await api.get(`/dispatch/assignments/${user.unitId.toUpperCase()}`);
+            personnelInfo = pResp.data;
+         }
       } catch (err: any) {
          const stored = localStorage.getItem('CivicResource_user') || localStorage.getItem('CivicFlow_user');
          const parsed = stored ? JSON.parse(stored) : null;
@@ -204,12 +215,15 @@ export default function DriverHUD() {
          if (unitId) {
             const fallback = await api.get(`/dispatch/assignments/${unitId.toUpperCase()}`);
             data = fallback.data?.assignedIncidents || [];
+            personnelInfo = fallback.data;
          } else if (err?.response?.status >= 500) {
             throw err;
          }
       }
 
       setIncidents(data || []);
+      setTaskQueue(personnelInfo?.taskQueue || []);
+      setAssignedResource(personnelInfo?.assignedResource || null);
 
       const sorted = [...(data || [])].sort((a: any, b: any) => {
          const score = (incident: any) => {
@@ -277,13 +291,24 @@ export default function DriverHUD() {
       setIsCompleting(true);
       try {
          await api.put(`/incidents/${activeIncident._id}/status`, { status: 'resolved' });
-         toast.success("Incident marked resolved");
+         toast.success("Incident marked resolved. Checking for next task...");
          await refreshAssignments();
       } catch (err) {
          toast.error("Failed to mark incident resolved");
          console.error(err);
       } finally {
          setIsCompleting(false);
+      }
+   };
+
+   const handleRejectQueueTask = async (incidentId: string) => {
+      try {
+         await api.post('/dispatch/reject-task', { incidentId, reason: "Worker requested rejection" });
+         toast.success("Task rejected and returned to pool");
+         await refreshAssignments();
+      } catch (err) {
+         toast.error("Failed to reject task");
+         console.error(err);
       }
    };
 
@@ -357,8 +382,12 @@ export default function DriverHUD() {
                  <Truck className="w-6 h-6 text-white" />
               </div>
               <div>
-                 <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900 leading-none">Operational HUD</h1>
-                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Field Resource Relay v4.0</p>
+                 <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900 leading-none">
+                    {assignedResource ? assignedResource.name : 'Operational HUD'}
+                 </h1>
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">
+                    {assignedResource ? `${assignedResource.type} • RELAY V4.0` : 'Field Resource Relay v4.0'}
+                 </p>
               </div>
            </div>
            <div className="flex items-center gap-3 px-5 py-2.5 rounded-full bg-white border border-border/60 shadow-inner">
@@ -488,6 +517,30 @@ export default function DriverHUD() {
             <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-900 mb-6 flex items-center gap-3">
                <Activity className="w-4 h-4 text-primary" /> Active Signal Registry
             </h3>
+
+            {taskQueue.length > 0 && (
+               <div className="mb-8 space-y-4">
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-amber-600 flex items-center gap-2">
+                     <Clock className="w-3.5 h-3.5" /> Up Next (Queue)
+                  </h4>
+                  {taskQueue.map((task: any) => (
+                     <div key={task._id} className="p-5 rounded-2xl bg-amber-50 border border-amber-100 relative group overflow-hidden">
+                        <div className="flex items-center justify-between mb-2">
+                           <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">#{task._id.slice(-6)}</span>
+                           <button 
+                              onClick={() => handleRejectQueueTask(task._id)}
+                              className="text-[8px] font-black text-red-500 uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity hover:underline"
+                           >
+                              Reject Task
+                           </button>
+                        </div>
+                        <h5 className="text-sm font-black text-slate-900 uppercase tracking-tight">{task.title}</h5>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase mt-1">{task.location?.address}</p>
+                     </div>
+                  ))}
+               </div>
+            )}
+
             <div className="relative">
                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                <input 

@@ -10,6 +10,7 @@ import {
 	runOperatorCopilot,
 	applyPlanLive,
 	startJourneySimulation,
+	rejectTask,
 } from '../controllers/dispatchController.js';
 import { protect } from '../middleware/authMiddleware.js'; // Assuming auth middleware exists
 
@@ -23,6 +24,7 @@ router.route('/ai-analyze').post(protect, getAIAnalysis);
 router.route('/copilot').post(protect, runOperatorCopilot);
 router.route('/apply-plan-live').post(protect, applyPlanLive);
 router.route('/start-journey-simulation').post(protect, startJourneySimulation);
+router.route('/reject-task').post(protect, rejectTask);
 router.route('/crisis-mode').get(protect, getCrisisMode).post(protect, setCrisisMode);
 
 export default router;

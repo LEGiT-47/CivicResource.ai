@@ -8,7 +8,7 @@ const resourceSchema = mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ['police', 'fire', 'medical', 'public_works', 'drone'],
+      enum: ['police', 'fire', 'medical', 'public_works', 'drone', 'utility', 'sanitation'],
       required: true,
     },
     status: {
@@ -23,6 +23,11 @@ const resourceSchema = mongoose.Schema(
     currentIncident: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Incident',
+      default: null,
+    },
+    assignedPersonnel: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Personnel',
       default: null,
     },
     batteryOrFuelLevel: {
