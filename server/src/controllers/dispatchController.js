@@ -78,6 +78,35 @@ const classifyIncidentFamily = (incident) => {
   return 'general';
 };
 
+const classifyResourceServiceFamily = (resource) => {
+  const text = `${resource?.type || ''} ${resource?.name || ''}`.toLowerCase();
+  if (/(garbage|trash|waste|sanitation|litter|dump)/.test(text)) return 'garbage';
+  if (/(water|tanker|pipe|hydrant|flood|drain|sewer)/.test(text)) return 'water';
+  if (/(road|pothole|maintenance|repair|utility|public_works|public works)/.test(text)) return 'maintenance';
+  if (/(fire)/.test(text)) return 'fire';
+  if (/(medical|ambulance)/.test(text)) return 'medical';
+  if (/(police|patrol)/.test(text)) return 'safety';
+  return 'general';
+};
+
+const scoreResourceForIncident = ({ incident, resource, aiPreferredResourceId }) => {
+  const family = classifyIncidentFamily(incident);
+  const resourceFamily = classifyResourceServiceFamily(resource);
+  const km = distanceKm(resource?.location, incident?.location);
+
+  const familyPenalty =
+    family === 'general'
+      ? 0.7
+      : resourceFamily === family
+        ? 0
+        : resourceFamily === 'general'
+          ? 1.2
+          : 2.4;
+
+  const aiPreferenceBonus = String(resource?._id) === String(aiPreferredResourceId || '') ? -0.5 : 0;
+  return km + familyPenalty + aiPreferenceBonus;
+};
+
 const incidentToPersonnelType = (incident) => {
   const incidentType = String(incident?.type || '').toLowerCase();
   const need = incidentNeed(incident);
@@ -367,10 +396,19 @@ export const assignPersonnel = async (req, res) => {
 
     let resource = resourceId ? await Resource.findById(resourceId) : null;
     const results = [];
+    let didDispatch = false;
+    let didQueue = false;
+    const expectedType = incidentToPersonnelType(incident);
 
     for (const pId of idsToProcess) {
       const personnel = await Personnel.findById(pId);
       if (!personnel) continue;
+
+      const personnelType = String(personnel.type || '').toLowerCase();
+      if (personnelType !== expectedType) {
+        results.push({ id: pId, status: 'skipped_type_mismatch', expectedType, actualType: personnelType || 'unknown' });
+        continue;
+      }
 
       // Handle Queuing if busy
       if (personnel.status === 'busy') {
@@ -378,6 +416,7 @@ export const assignPersonnel = async (req, res) => {
           personnel.taskQueue.push(incidentId);
           await personnel.save();
           results.push({ id: pId, status: 'queued' });
+          didQueue = true;
         }
         continue;
       }
@@ -408,9 +447,14 @@ export const assignPersonnel = async (req, res) => {
         incident.assignedPersonnelList.push(pId);
       }
       results.push({ id: pId, status: 'dispatched' });
+      didDispatch = true;
     }
 
-    incident.dispatchStatus = 'dispatched';
+    if (didDispatch) {
+      incident.dispatchStatus = 'dispatched';
+    } else if (!didQueue) {
+      incident.dispatchStatus = 'unassigned';
+    }
     if (resourceId && !incident.assignedResources.includes(resourceId)) {
       incident.assignedResources.push(resourceId);
     }
@@ -1097,14 +1141,10 @@ export const applyPlanLive = async (req, res) => {
 
     const applied = [];
     const usedIncidentIds = new Set();
+    const usedResourceIds = new Set();
 
     for (const allocation of prioritizedAllocations) {
       if (applied.length >= maxAssignments) break;
-
-      const resource = resourceById.get(String(allocation.resource_id));
-      if (!resource || resource.status === 'dispatched' || resource.status === 'maintenance') {
-        continue;
-      }
 
       const priorityIncidentId = allocation.priority_incident_id ? String(allocation.priority_incident_id) : null;
       let zoneIncidents = (incidentsByZone[String(allocation.zone_id)] || [])
@@ -1144,6 +1184,19 @@ export const applyPlanLive = async (req, res) => {
 
       if (!targetIncident) continue;
 
+      const aiPreferredResource = resourceById.get(String(allocation.resource_id));
+      const candidateResources = resources
+        .filter((r) => !usedResourceIds.has(String(r._id)))
+        .filter((r) => r.status !== 'offline' && r.status !== 'dispatched' && r.status !== 'maintenance')
+        .sort(
+          (a, b) =>
+            scoreResourceForIncident({ incident: targetIncident, resource: a, aiPreferredResourceId: aiPreferredResource?._id }) -
+            scoreResourceForIncident({ incident: targetIncident, resource: b, aiPreferredResourceId: aiPreferredResource?._id })
+        );
+
+      const resource = candidateResources[0] || aiPreferredResource;
+      if (!resource) continue;
+
       const previousIncidentId = resource.currentIncident ? String(resource.currentIncident) : null;
       if (previousIncidentId && previousIncidentId !== String(targetIncident._id)) {
         await Incident.findByIdAndUpdate(previousIncidentId, {
@@ -1154,6 +1207,7 @@ export const applyPlanLive = async (req, res) => {
       resource.status = 'dispatched';
       resource.currentIncident = targetIncident._id;
       await resource.save();
+      usedResourceIds.add(String(resource._id));
 
       targetIncident.dispatchStatus = 'dispatched';
       if (targetIncident.status === 'resolved') {
@@ -1210,8 +1264,10 @@ export const applyPlanLive = async (req, res) => {
           type: resource.type,
         },
         personnel: assignedPersonnel,
-        etaMinutes: allocation.eta_minutes,
+        etaMinutes: Math.max(3, Math.round(distanceKm(resource.location, targetIncident.location) / 0.45)),
         urgencyScore: allocation.urgency_score,
+        distanceKm: Number(distanceKm(resource.location, targetIncident.location).toFixed(2)),
+        resourceFamily: classifyResourceServiceFamily(resource),
       });
     }
 

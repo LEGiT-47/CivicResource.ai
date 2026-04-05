@@ -8,8 +8,9 @@ import {
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
-import type { LatLngExpression } from "leaflet";
+import { MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip } from "react-leaflet";
+import { divIcon } from "leaflet";
+import type { DivIcon, LatLngExpression } from "leaflet";
 
 const haversineKm = (aLat: number, aLng: number, bLat: number, bLng: number) => {
    const toRad = (v: number) => (Math.PI / 180) * v;
@@ -30,6 +31,29 @@ const formatCountdown = (seconds: number) => {
    return `${minutes}:${remaining}`;
 };
 
+const vehicleEmojiByType: Record<string, string> = {
+   police: "🚓",
+   fire: "🚒",
+   medical: "🚑",
+   utility: "🚐",
+   sanitation: "🚛",
+   public_works: "🚚",
+   drone: "🚁",
+};
+
+const makeBadgeIcon = (symbol: string, bg: string, fg = "#ffffff"): DivIcon =>
+   divIcon({
+      className: "",
+      html: `<div style="width:30px;height:30px;border-radius:9999px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;border:2px solid #ffffff;box-shadow:0 6px 16px rgba(0,0,0,0.25);font-weight:900;font-size:14px;line-height:1;">${symbol}</div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -16],
+   });
+
+const complaintIcon = () => makeBadgeIcon("C", "#ff4f00", "#ffffff");
+const responderIcon = (type: string) => makeBadgeIcon(vehicleEmojiByType[String(type || "").toLowerCase()] || "🚚", "#2563eb", "#ffffff");
+const riskIcon = (risk: "high" | "medium" | "low") => makeBadgeIcon("⚠", risk === "high" ? "#ef4444" : risk === "medium" ? "#f59e0b" : "#10b981", "#ffffff");
+
 type RiskMarker = {
    id: string;
    lat: number;
@@ -37,14 +61,6 @@ type RiskMarker = {
    label: string;
    risk: "high" | "medium" | "low";
 };
-
-function TacticalMapFocus({ position }: { position: LatLngExpression }) {
-   const map = useMap();
-   useEffect(() => {
-      map.flyTo(position, Math.max(map.getZoom(), 13), { duration: 0.8 });
-   }, [map, position]);
-   return null;
-}
 
 function TacticalWorkerMap({
    activeIncident,
@@ -114,7 +130,6 @@ function TacticalWorkerMap({
    return (
       <div className="h-[340px] rounded-3xl overflow-hidden border border-border/50 relative">
          <MapContainer center={incidentPoint} zoom={13} className="h-full w-full" zoomControl={false}>
-            <TacticalMapFocus position={incidentPoint} />
             <TileLayer
                attribution='&copy; OpenStreetMap contributors'
                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -125,11 +140,7 @@ function TacticalWorkerMap({
                pathOptions={{ color: "#2563eb", weight: 4, opacity: 0.9, dashArray: "10 6" }}
             />
 
-            <CircleMarker
-               center={unitPoint}
-               radius={8}
-               pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#2563eb", fillOpacity: 1 }}
-            >
+            <Marker position={unitPoint} icon={responderIcon(activeIncident?.assignedPersonnel?.type || 'utility')}>
                <Tooltip direction="top">Responder Unit</Tooltip>
                <Popup>
                   <div className="text-[12px] font-bold">Responder Unit</div>
@@ -137,34 +148,25 @@ function TacticalWorkerMap({
                   <div className="text-[11px] uppercase text-slate-500">{String(trackingCurrent?.phase || activeIncident?.dispatchStatus || 'en-route')}</div>
                   <div className="text-[11px] text-slate-500">{distanceKm.toFixed(2)} km away</div>
                </Popup>
-            </CircleMarker>
+            </Marker>
 
-            <CircleMarker
-               center={incidentPoint}
-               radius={10}
-               pathOptions={{ color: "#ffffff", weight: 2, fillColor: "#ff4f00", fillOpacity: 1 }}
-            >
+            <Marker position={incidentPoint} icon={complaintIcon()}>
                <Tooltip direction="top">Incident Target</Tooltip>
                <Popup>
                   <div className="text-[12px] font-bold">{activeIncident?.title}</div>
                   <div className="text-[11px] text-slate-500">{incidentLat.toFixed(5)}, {incidentLng.toFixed(5)}</div>
                </Popup>
-            </CircleMarker>
+            </Marker>
 
             {riskMarkers.map((risk) => (
-               <CircleMarker
-                  key={risk.id}
-                  center={[risk.lat, risk.lng]}
-                  radius={7}
-                  pathOptions={{ color: "#ffffff", weight: 2, fillColor: riskColor(risk.risk), fillOpacity: 0.9 }}
-               >
+               <Marker key={risk.id} position={[risk.lat, risk.lng]} icon={riskIcon(risk.risk)}>
                   <Tooltip direction="top">{risk.label}</Tooltip>
                   <Popup>
                      <div className="text-[12px] font-bold">{risk.label}</div>
                      <div className="text-[11px] uppercase text-slate-500">Risk: {risk.risk}</div>
                      <div className="text-[11px] text-slate-500">{risk.lat.toFixed(5)}, {risk.lng.toFixed(5)}</div>
                   </Popup>
-               </CircleMarker>
+               </Marker>
             ))}
          </MapContainer>
 
@@ -335,6 +337,7 @@ export default function DriverHUD() {
    const trackingEta = Number(activeIncident?.tracking?.currentLocation?.etaMinutes);
    const trackingEtaSeconds = Number(activeIncident?.tracking?.currentLocation?.etaSeconds);
    const trackingPhase = String(activeIncident?.tracking?.currentLocation?.phase || activeIncident?.dispatchStatus || '').toLowerCase();
+   const hasTrackingEta = Number.isFinite(trackingEtaSeconds) || Number.isFinite(trackingEta);
    const incidentLat = Number(activeIncident?.location?.lat);
    const incidentLng = Number(activeIncident?.location?.lng);
    const unitLat = Number(activeIncident?.tracking?.currentLocation?.lat ?? activeIncident?.assignedPersonnel?.location?.lat);
@@ -346,6 +349,10 @@ export default function DriverHUD() {
       Number.isFinite(unitLat) && Number.isFinite(unitLng) && Number.isFinite(incidentLat) && Number.isFinite(incidentLng)
          ? Math.max(1, Math.round((haversineKm(unitLat, unitLng, incidentLat, incidentLng) / 28) * 60))
          : null;
+   const isResolved = Boolean(activeIncident && (activeIncident.status === 'resolved' || activeIncident.dispatchStatus === 'completed'));
+   const isEngaged = Boolean(activeIncident && (activeIncident.status === 'investigating' || activeIncident.dispatchStatus === 'on-site' || activeIncident.dispatchStatus === 'resolving'));
+   const canInitialize = Boolean(activeIncident) && !isResolved && !isEngaged;
+   const canResolve = Boolean(activeIncident) && !isResolved && isEngaged;
    const etaBaseMinutes = Number.isFinite(trackingEta) ? trackingEta : fallbackEtaMinutes;
    const lastEtaSampleAt = activeIncident?.tracking?.currentLocation?.at ? new Date(activeIncident.tracking.currentLocation.at).getTime() : Date.now();
    const elapsedSinceSampleMinutes = Math.max(0, (Date.now() - lastEtaSampleAt) / 60000);
@@ -353,18 +360,23 @@ export default function DriverHUD() {
       ? trackingEtaSeconds
       : Number.isFinite(etaBaseMinutes)
          ? Number(etaBaseMinutes) * 60
-         : Number.isFinite(fallbackEtaMinutes)
+         : Number.isFinite(fallbackEtaMinutes) && !canInitialize
             ? Number(fallbackEtaMinutes) * 60
             : Number.NaN;
    const elapsedSinceSampleSeconds = Math.max(0, (Date.now() - lastEtaSampleAt) / 1000);
    const liveEtaSeconds = Number.isFinite(etaBaseSeconds)
       ? Math.max(0, Math.round(Number(etaBaseSeconds) - elapsedSinceSampleSeconds))
       : Number.NaN;
-   const etaText = Number.isFinite(liveEtaSeconds) ? formatCountdown(liveEtaSeconds) : 'Estimating';
-   const isResolved = Boolean(activeIncident && (activeIncident.status === 'resolved' || activeIncident.dispatchStatus === 'completed'));
-   const isEngaged = Boolean(activeIncident && (activeIncident.status === 'investigating' || activeIncident.dispatchStatus === 'on-site' || activeIncident.dispatchStatus === 'resolving'));
-   const canInitialize = Boolean(activeIncident) && !isResolved && !isEngaged;
-   const canResolve = Boolean(activeIncident) && !isResolved && isEngaged;
+   const etaText = canInitialize && !hasTrackingEta
+      ? 'Init Route'
+      : Number.isFinite(liveEtaSeconds)
+         ? formatCountdown(liveEtaSeconds)
+         : 'Estimating';
+   const googleMapsHref = Number.isFinite(incidentLat) && Number.isFinite(incidentLng)
+      ? Number.isFinite(unitLat) && Number.isFinite(unitLng)
+         ? `https://www.google.com/maps/dir/?api=1&origin=${unitLat},${unitLng}&destination=${incidentLat},${incidentLng}&travelmode=driving`
+         : `https://www.google.com/maps/search/?api=1&query=${incidentLat},${incidentLng}`
+      : null;
 
   if (loading) return (
     <div className="h-full flex items-center justify-center bg-white">
@@ -459,6 +471,16 @@ export default function DriverHUD() {
                   </div>
                   <TacticalWorkerMap activeIncident={activeIncident} incidents={incidents} />
                   <p className="mt-4 text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Coordinates, route path, and nearby risk markers update per selected incident.</p>
+                  {googleMapsHref && (
+                     <a
+                        href={googleMapsHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-primary/30 bg-primary/5 text-[9px] font-black uppercase tracking-widest text-primary hover:bg-primary hover:text-white transition-all"
+                     >
+                        Open Google Maps Route <ArrowRight className="w-3.5 h-3.5" />
+                     </a>
+                  )}
                </div>
                
                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

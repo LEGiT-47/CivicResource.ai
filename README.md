@@ -89,4 +89,24 @@ graph TD
    - `ai-engine/`: `uvicorn main:app --reload --port 8000`
 
 ---
+## ✅ Latest Updates (Apr 2026)
+
+### Dispatch Reliability & Allocation Quality
+- **Type-Safe Dispatch Assignment**: Water/utility complaints can no longer be assigned to police responders.
+- **Apply Button Hardening**: Manual **Apply** now selects the nearest compatible available worker instead of falling back to unrelated worker types.
+- **Backend Guardrails**: `/api/dispatch/assign` now rejects personnel type mismatches with explicit `skipped_type_mismatch` results.
+- **Status Integrity**: Incident `dispatchStatus` is now only marked `dispatched` when at least one valid dispatch actually occurs.
+
+### Live Plan Behavior
+- **Live Apply Plan Compatibility**: Maintains proximity-aware assignment while honoring responder-family compatibility for safer auto-allocation.
+- **Operational Transparency**: Assignment results now clearly indicate when candidates were skipped due to mismatch.
+
+### Multilingual UX Refinements
+- **Native Language Labels** on public selectors:
+    - Hindi shown as **हिंदी**
+    - Marathi shown as **मराठी**
+    - English shown as **English**
+- Applied in both **Complaint Intake** and **Landing Page** language switchers.
+
+---
 *Built for Civic Excellence & Modern Urban Governance.*

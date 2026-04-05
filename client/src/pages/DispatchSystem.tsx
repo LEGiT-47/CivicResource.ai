@@ -115,6 +115,66 @@ export default function DispatchSystem() {
         }
     };
 
+    const expectedPersonnelTypeForIncident = (incident: any) => {
+        const incidentType = String(incident?.type || '').toLowerCase();
+        const text = `${incident?.type || ''} ${incident?.title || ''} ${incident?.details || ''}`.toLowerCase();
+
+        if (incidentType === 'fire') return 'fire';
+        if (incidentType === 'medical') return 'medical';
+        if (incidentType === 'crime' || incidentType === 'safety' || incidentType === 'traffic') return 'police';
+        if (incidentType === 'sanitation' || /(garbage|trash|waste|sanitation|litter|dump)/.test(text)) return 'sanitation';
+        return 'utility';
+    };
+
+    const pickAvailablePersonnelForIncident = (incident: any) => {
+        const available = personnel.filter((p: any) => String(p?.status || '').toLowerCase() === 'available');
+        if (!available.length) return null;
+
+        const preferredType = expectedPersonnelTypeForIncident(incident);
+        const compatible = available.filter((p: any) => String(p?.type || '').toLowerCase() === preferredType);
+        if (!compatible.length) return null;
+
+        return compatible
+            .slice()
+            .sort(
+                (a: any, b: any) =>
+                    distanceKm(a?.assignedResource?.location || a?.location, incident?.location) -
+                    distanceKm(b?.assignedResource?.location || b?.location, incident?.location)
+            )[0];
+    };
+
+    const dispatchDirect = async (incident: any, resourceId?: string) => {
+        if (!incident?._id) {
+            toast.error("Select an incident and click Apply");
+            return;
+        }
+
+        const chosenPersonnel = pickAvailablePersonnelForIncident(incident);
+        if (!chosenPersonnel?._id) {
+            const expectedType = expectedPersonnelTypeForIncident(incident);
+            toast.error(`No available ${expectedType} worker for this complaint right now`);
+            return;
+        }
+
+        setIsDispatching(true);
+        try {
+            const { data } = await api.post('/dispatch/assign', {
+                incidentId: incident._id,
+                personnelIds: [chosenPersonnel._id],
+                resourceId,
+            });
+            setSelectedIncident(incident);
+            setSelectedPersonnelIds([chosenPersonnel._id]);
+            toast.success(data.message || "Dispatch successful");
+            await fetchData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || "Dispatch failed");
+            console.error(err);
+        } finally {
+            setIsDispatching(false);
+        }
+    };
+
     const handleAddResource = async () => {
         if (!newResource.name) {
             toast.error("Resource name required");
@@ -332,29 +392,86 @@ export default function DispatchSystem() {
 
         if (newestIncident && !suggestions.some((item: any) => item.incident?._id === newestIncident._id)) {
             const topResource = resourceById[String(basePlan[0]?.resource_id)] || fallbackResources[0];
-            if (topResource) {
-                suggestions.unshift({
-                    resource: topResource,
-                    incident: newestIncident,
-                    eta: basePlan[0]?.eta_minutes,
-                    predictedTravel: basePlan[0]?.predicted_travel_time_minutes || basePlan[0]?.eta_minutes,
-                    routeFactors: basePlan[0]?.route_factors || { trafficIndex: 1, roadConditionIndex: 1 },
-                    rankingScore: Math.max(100, Number(basePlan[0]?.ranking_score || 0)),
-                    zone: zoneIdForIncident(newestIncident),
-                    urgency: Number(basePlan[0]?.urgency_score || 0),
-                    explainability: basePlan[0]?.explainability || {
-                        score: 100,
-                        why: ['Newest active incident pinned for live response'],
-                        factors: { urgency: 100, eta: 100, familyMatch: 100, severity: 100, learningConfidence: 0 },
-                    },
-                    preferredFamily: basePlan[0]?.preferred_family || incidentFamily(newestIncident),
-                    resourceFamily: basePlan[0]?.resource_family || topResource.type,
-                    pinned: true,
-                });
-            }
+            const pendingResource = {
+                _id: `pending-${newestIncident._id}`,
+                name: 'Awaiting Available Unit',
+                type: 'pending',
+                status: 'offline',
+                location: newestIncident.location,
+            };
+
+            suggestions.unshift({
+                resource: topResource || pendingResource,
+                incident: newestIncident,
+                eta: topResource ? basePlan[0]?.eta_minutes : null,
+                predictedTravel: topResource ? (basePlan[0]?.predicted_travel_time_minutes || basePlan[0]?.eta_minutes) : null,
+                routeFactors: basePlan[0]?.route_factors || { trafficIndex: 1, roadConditionIndex: 1 },
+                rankingScore: Math.max(100, Number(basePlan[0]?.ranking_score || 0)),
+                zone: zoneIdForIncident(newestIncident),
+                urgency: Number(basePlan[0]?.urgency_score || 0),
+                explainability: basePlan[0]?.explainability || {
+                    score: 100,
+                    why: [topResource ? 'Newest active incident pinned for live response' : 'Newest incident is queued until a matching unit is available'],
+                    factors: { urgency: 100, eta: topResource ? 100 : 0, familyMatch: topResource ? 100 : 0, severity: 100, learningConfidence: 0 },
+                },
+                preferredFamily: basePlan[0]?.preferred_family || incidentFamily(newestIncident),
+                resourceFamily: basePlan[0]?.resource_family || (topResource?.type || 'pending'),
+                assignment_type: topResource ? 'apply' : 'queue',
+                pinned: true,
+            });
         }
 
-        return suggestions.slice(0, 6);
+        const coveredIds = new Set(suggestions.map((item: any) => String(item?.incident?._id || '')));
+        const toQueuedCard = (incident: any) => ({
+            resource: {
+                _id: `pending-${incident._id}`,
+                name: 'Awaiting Available Unit',
+                type: 'pending',
+                status: 'offline',
+                location: incident.location,
+            },
+            incident,
+            eta: null,
+            predictedTravel: null,
+            routeFactors: { trafficIndex: 1, roadConditionIndex: 1 },
+            rankingScore: 95,
+            zone: zoneIdForIncident(incident),
+            urgency: 95,
+            explainability: {
+                score: 95,
+                why: ['Incident kept visible in scheduler while awaiting nearest available unit'],
+                factors: { urgency: 100, eta: 0, familyMatch: 0, severity: 100, learningConfidence: 0 },
+            },
+            preferredFamily: incidentFamily(incident),
+            resourceFamily: 'pending',
+            assignment_type: 'queue',
+            pinned: true,
+        });
+
+        const queuedVisible = [...unresolved]
+            .filter((incident: any) => String(incident?.dispatchStatus || '').toLowerCase() === 'unassigned')
+            .filter((incident: any) => !coveredIds.has(String(incident?._id || '')))
+            .sort((a: any, b: any) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime())
+            .slice(0, 2)
+            .map((incident: any) => toQueuedCard(incident));
+
+        const newestUnassigned = [...unresolved]
+            .filter((incident: any) => String(incident?.dispatchStatus || '').toLowerCase() === 'unassigned')
+            .sort((a: any, b: any) => new Date(b?.createdAt || 0).getTime() - new Date(a?.createdAt || 0).getTime())
+            .slice(0, 3);
+
+        const newestPinned = newestUnassigned.map((incident: any) => {
+            const existing = suggestions.find((item: any) => String(item?.incident?._id) === String(incident?._id));
+            return existing || toQueuedCard(incident);
+        });
+
+        const pinnedIds = new Set(newestPinned.map((item: any) => String(item?.incident?._id || '')));
+        const remainingSuggestions = [...suggestions, ...queuedVisible]
+            .filter((item: any) => !pinnedIds.has(String(item?.incident?._id || '')));
+
+        const finalSuggestions = [...newestPinned, ...remainingSuggestions];
+
+        return finalSuggestions.slice(0, 6);
     }, [aiPulse, incidents, resources]);
 
     const applyLivePlan = async () => {
@@ -800,7 +917,7 @@ export default function DispatchSystem() {
                                                 )}
                                             </div>
                                             <button
-                                                onClick={() => handleDispatch(s.personnel_id, s.resource_id, s.incident._id)}
+                                                onClick={() => dispatchDirect(s.incident, s.resource?._id || s.resource_id)}
                                                 disabled={String(s.resource_type || '').toLowerCase() === 'pending'}
                                                 className="px-3 py-2 rounded-lg border border-border/40 text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-primary hover:text-primary transition-all"
                                             >
@@ -855,8 +972,7 @@ export default function DispatchSystem() {
                                                 <td className="py-3 pr-4">
                                                     <button
                                                         onClick={() => {
-                                                            setSelectedPersonnel(personnel[0]); // Mock selection for quick send
-                                                            handleDispatch(personnel[0]?._id, r._id);
+                                                            dispatchDirect(selectedIncident, r._id);
                                                         }}
                                                         disabled={!selectedIncident || isDispatching || r.status === 'dispatched'}
                                                         className="px-3 py-2 rounded-lg border border-border/40 text-[9px] font-black uppercase tracking-widest text-slate-700 hover:border-primary hover:text-primary transition-all disabled:opacity-50"

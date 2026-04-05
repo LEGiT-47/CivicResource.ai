@@ -37,8 +37,8 @@ type ReportLanguage = "english" | "hindi" | "marathi";
 
 const languageConfig: Record<ReportLanguage, { label: string; speech: string }> = {
   english: { label: "English", speech: "en-IN" },
-  hindi: { label: "Hindi", speech: "hi-IN" },
-  marathi: { label: "Marathi", speech: "mr-IN" },
+  hindi: { label: "हिंदी", speech: "hi-IN" },
+  marathi: { label: "मराठी", speech: "mr-IN" },
 };
 
 const copy: Record<ReportLanguage, Record<string, string>> = {

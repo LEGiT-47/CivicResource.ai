@@ -93,7 +93,11 @@ const seedData = async () => {
       { name: 'Worker 17 - Utility Grid Field Unit', email: 'worker17@civicflow.ai', password: 'worker17', role: 'responder', organization: 'Mumbai Electricity Board', unitId: 'UTL-005' },
       { name: 'Worker 18 - Utility Grid Supervisor', email: 'worker18@civicflow.ai', password: 'worker18', role: 'responder', organization: 'Mumbai Electricity Board', unitId: 'UTL-006' },
       { name: 'Worker 19 - Flood Response Unit', email: 'worker19@civicflow.ai', password: 'worker19', role: 'responder', organization: 'Mumbai Disaster Response', unitId: 'WAT-004' },
-      { name: 'Worker 20 - Drainage Repair Unit', email: 'worker20@civicflow.ai', password: 'worker20', role: 'responder', organization: 'Mumbai Public Works', unitId: 'UTL-007' }
+      { name: 'Worker 20 - Drainage Repair Unit', email: 'worker20@civicflow.ai', password: 'worker20', role: 'responder', organization: 'Mumbai Public Works', unitId: 'UTL-007' },
+      { name: 'Worker 21 - Goregaon Sanitation Team', email: 'worker21@civicflow.ai', password: 'worker21', role: 'responder', organization: 'Mumbai Sanitation Department', unitId: 'SAN-004' },
+      { name: 'Worker 22 - Malad Sanitation Team', email: 'worker22@civicflow.ai', password: 'worker22', role: 'responder', organization: 'Mumbai Sanitation Department', unitId: 'SAN-005' },
+      { name: 'Worker 23 - Goregaon Water Supply', email: 'worker23@civicflow.ai', password: 'worker23', role: 'responder', organization: 'Mumbai Water Supply', unitId: 'WAT-005' },
+      { name: 'Worker 24 - Malad Water Supply', email: 'worker24@civicflow.ai', password: 'worker24', role: 'responder', organization: 'Mumbai Water Supply', unitId: 'WAT-006' }
     ]);
 
     const incidents = await Incident.create([
@@ -226,7 +230,11 @@ const seedData = async () => {
       { name: 'Drainage Repair DR-05', type: 'public_works', status: 'patrol', location: { lat: 19.04, lng: 72.84 }, batteryOrFuelLevel: 84 },
       { name: 'Drainage Repair DR-06', type: 'public_works', status: 'patrol', location: { lat: 19.17, lng: 72.86 }, batteryOrFuelLevel: 76 },
       { name: 'Road Service RS-41', type: 'public_works', status: 'patrol', location: { lat: 19.09, lng: 72.9 }, batteryOrFuelLevel: 81 },
-      { name: 'Road Service RS-42', type: 'public_works', status: 'patrol', location: { lat: 19.12, lng: 72.85 }, batteryOrFuelLevel: 78 }
+      { name: 'Road Service RS-42', type: 'public_works', status: 'patrol', location: { lat: 19.12, lng: 72.85 }, batteryOrFuelLevel: 78 },
+      { name: 'Garbage Truck GT-43 Goregaon', type: 'public_works', status: 'patrol', location: { lat: 19.1655, lng: 72.8475 }, batteryOrFuelLevel: 91 },
+      { name: 'Garbage Truck GT-44 Malad', type: 'public_works', status: 'patrol', location: { lat: 19.1862, lng: 72.8421 }, batteryOrFuelLevel: 88 },
+      { name: 'Water Tanker WT-33 Goregaon', type: 'public_works', status: 'patrol', location: { lat: 19.1618, lng: 72.8512 }, batteryOrFuelLevel: 92 },
+      { name: 'Water Tanker WT-34 Malad', type: 'public_works', status: 'patrol', location: { lat: 19.1901, lng: 72.8397 }, batteryOrFuelLevel: 89 }
     ]);
 
     const personnel = await Personnel.create([
@@ -258,7 +266,11 @@ const seedData = async () => {
       { name: 'Worker 17 - Utility Grid Field Unit', type: 'utility', status: 'available', location: { lat: 19.02, lng: 72.9 }, contact: { phone: '+91-9000000017', unitId: 'UTL-005' } },
       { name: 'Worker 18 - Utility Grid Supervisor', type: 'utility', status: 'available', location: { lat: 19.17, lng: 72.83 }, contact: { phone: '+91-9000000018', unitId: 'UTL-006' } },
       { name: 'Worker 19 - Flood Response Unit', type: 'utility', status: 'available', location: { lat: 19.07, lng: 72.95 }, contact: { phone: '+91-9000000019', unitId: 'WAT-004' } },
-      { name: 'Worker 20 - Drainage Repair Unit', type: 'utility', status: 'available', location: { lat: 19.04, lng: 72.9 }, contact: { phone: '+91-9000000020', unitId: 'UTL-007' } }
+      { name: 'Worker 20 - Drainage Repair Unit', type: 'utility', status: 'available', location: { lat: 19.04, lng: 72.9 }, contact: { phone: '+91-9000000020', unitId: 'UTL-007' } },
+      { name: 'Worker 21 - Goregaon Sanitation Team', type: 'sanitation', status: 'available', location: { lat: 19.1642, lng: 72.8488 }, contact: { phone: '+91-9000000021', unitId: 'SAN-004' } },
+      { name: 'Worker 22 - Malad Sanitation Team', type: 'sanitation', status: 'available', location: { lat: 19.1855, lng: 72.8428 }, contact: { phone: '+91-9000000022', unitId: 'SAN-005' } },
+      { name: 'Worker 23 - Goregaon Water Supply', type: 'utility', status: 'available', location: { lat: 19.1621, lng: 72.8504 }, contact: { phone: '+91-9000000023', unitId: 'WAT-005' } },
+      { name: 'Worker 24 - Malad Water Supply', type: 'utility', status: 'available', location: { lat: 19.1884, lng: 72.8406 }, contact: { phone: '+91-9000000024', unitId: 'WAT-006' } }
     ]);
 
     const extraIncidents = await Incident.create([

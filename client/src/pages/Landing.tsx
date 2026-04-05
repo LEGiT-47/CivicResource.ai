@@ -40,6 +40,12 @@ const copy = {
   },
 } as const;
 
+const localeLabels: Record<Locale, string> = {
+  english: "English",
+  hindi: "हिंदी",
+  marathi: "मराठी",
+};
+
 export default function Landing() {
   const { locale, setLocale, isIndic } = usePublicLocale();
   const text = copy[locale];
@@ -66,7 +72,7 @@ export default function Landing() {
                   locale === lang ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"
                 )}
               >
-                {lang}
+                {localeLabels[lang]}
               </button>
             ))}
           </div>

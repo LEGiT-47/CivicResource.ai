@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Activity, Flame, MapPin, Truck, ZoomIn, ZoomOut } from "lucide-react";
-import { Circle, CircleMarker, MapContainer, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
-import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
+import { Circle, MapContainer, Marker, Polyline, Popup, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { divIcon } from "leaflet";
+import type { DivIcon, LatLngBoundsExpression, LatLngExpression } from "leaflet";
 import { cn } from "@/lib/utils";
 
 const MUMBAI_CENTER: LatLngExpression = [19.076, 72.8777];
@@ -26,6 +27,32 @@ const resourceColor: Record<string, string> = {
   utility: "#0ea5e9",
   sanitation: "#10b981",
 };
+
+const vehicleEmojiByType: Record<string, string> = {
+  police: "🚓",
+  fire: "🚒",
+  medical: "🚑",
+  utility: "🚐",
+  sanitation: "🚛",
+  public_works: "🚚",
+  drone: "🚁",
+  pending: "⏳",
+};
+
+const makeBadgeIcon = (symbol: string, bg: string, fg = "#ffffff"): DivIcon =>
+  divIcon({
+    className: "",
+    html: `<div style="width:30px;height:30px;border-radius:9999px;background:${bg};color:${fg};display:flex;align-items:center;justify-content:center;border:2px solid #ffffff;box-shadow:0 6px 16px rgba(0,0,0,0.25);font-weight:900;font-size:14px;line-height:1;">${symbol}</div>`,
+    iconSize: [30, 30],
+    iconAnchor: [15, 15],
+    popupAnchor: [0, -16],
+  });
+
+const incidentIcon = (severity: string, selected: boolean) =>
+  makeBadgeIcon("C", selected ? "#111827" : heatColor[severity] || "#4f46e5");
+
+const unitIcon = (type: string) =>
+  makeBadgeIcon(vehicleEmojiByType[String(type || "").toLowerCase()] || "🚚", resourceColor[type] || "#0f172a", "#ffffff");
 
 const formatCountdown = (seconds: number) => {
   if (!Number.isFinite(seconds)) return "--:--";
@@ -226,18 +253,12 @@ export default function CityMap({
 
         {showPins &&
           validIncidents.map((inc: any) => (
-            <CircleMarker
+            <Marker
               key={`pin-${inc._id}`}
-              center={[Number(inc.location.lat), Number(inc.location.lng)]}
-              radius={selectedIncidentId === inc._id ? 11 : inc.severity === "critical" ? 9 : 7}
+              position={[Number(inc.location.lat), Number(inc.location.lng)]}
+              icon={incidentIcon(inc.severity, selectedIncidentId === inc._id)}
               eventHandlers={{
                 click: () => onIncidentSelect?.(inc._id),
-              }}
-              pathOptions={{
-                color: selectedIncidentId === inc._id ? "#111827" : "#ffffff",
-                weight: selectedIncidentId === inc._id ? 3 : 2,
-                fillColor: heatColor[inc.severity] || "#4f46e5",
-                fillOpacity: 1,
               }}
             >
               <Tooltip direction="top" offset={[0, -8]}>
@@ -251,7 +272,7 @@ export default function CityMap({
                   <div className="text-[11px] text-slate-500">{inc.location?.address || "No address"}</div>
                 </div>
               </Popup>
-            </CircleMarker>
+            </Marker>
           ))}
 
         {showResources &&
@@ -270,16 +291,10 @@ export default function CityMap({
                   dashArray: "6 6",
                 }}
               />
-              <CircleMarker
+              <Marker
                 key={`res-${u._id}`}
-                center={[u.lat, u.lng]}
-                radius={8}
-                pathOptions={{
-                  color: "#ffffff",
-                  weight: 2,
-                  fillColor: resourceColor[u.type] || "#0f172a",
-                  fillOpacity: 1,
-                }}
+                position={[u.lat, u.lng]}
+                icon={unitIcon(u.type)}
               >
                 <Tooltip direction="top" offset={[0, -8]}>
                   <div className="text-[11px] font-bold">{u.label}</div>
@@ -293,7 +308,7 @@ export default function CityMap({
                     <div className="text-[11px] text-slate-500">Target: {u.targetLat.toFixed(4)}, {u.targetLng.toFixed(4)}</div>
                   </div>
                 </Popup>
-              </CircleMarker>
+              </Marker>
             </div>
           ))}
 
@@ -319,16 +334,10 @@ export default function CityMap({
                   dashArray: "8 8",
                 }}
               />
-              <CircleMarker
+              <Marker
                 key={`person-${person._id}`}
-                center={[person.lat, person.lng]}
-                radius={person.status === "busy" ? 10 : 8}
-                pathOptions={{
-                  color: "#ffffff",
-                  weight: 2,
-                  fillColor: resourceColor[person.type] || "#0f172a",
-                  fillOpacity: 1,
-                }}
+                position={[person.lat, person.lng]}
+                icon={unitIcon(person.type)}
               >
                 <Tooltip direction="top" offset={[0, -8]}>
                   <div className="text-[11px] font-bold">{person.label}</div>
@@ -344,7 +353,7 @@ export default function CityMap({
                     {Number.isFinite(person.trackingEtaSeconds) && <div className="text-[11px] text-slate-500">ETA: {formatCountdown(person.trackingEtaSeconds)}</div>}
                   </div>
                 </Popup>
-              </CircleMarker>
+              </Marker>
             </div>
           );
         })}

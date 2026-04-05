@@ -1,5 +1,6 @@
 import Incident from '../models/Incident.js';
 import Personnel from '../models/Personnel.js';
+import Resource from '../models/Resource.js';
 
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || 'http://localhost:8000';
 
