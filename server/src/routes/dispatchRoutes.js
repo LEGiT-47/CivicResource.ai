@@ -9,6 +9,8 @@ import {
 	setCrisisMode,
 	runOperatorCopilot,
 	applyPlanLive,
+	recommendGroupedClusters,
+	applyGroupedClusterPlan,
 	startJourneySimulation,
 	rejectTask,
 } from '../controllers/dispatchController.js';
@@ -23,6 +25,8 @@ router.route('/assign').post(protect, assignPersonnel);
 router.route('/ai-analyze').post(protect, getAIAnalysis);
 router.route('/copilot').post(protect, runOperatorCopilot);
 router.route('/apply-plan-live').post(protect, applyPlanLive);
+router.route('/group-clusters/recommend').post(protect, recommendGroupedClusters);
+router.route('/group-clusters/apply').post(protect, applyGroupedClusterPlan);
 router.route('/start-journey-simulation').post(protect, startJourneySimulation);
 router.route('/reject-task').post(protect, rejectTask);
 router.route('/crisis-mode').get(protect, getCrisisMode).post(protect, setCrisisMode);

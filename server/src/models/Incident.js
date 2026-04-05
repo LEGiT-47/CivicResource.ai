@@ -149,6 +149,21 @@ const incidentSchema = mongoose.Schema(
         },
       ],
     },
+    clustering: {
+      clusterId: { type: String },
+      serviceFamily: { type: String },
+      stopOrder: { type: Number, default: 1 },
+      totalStops: { type: Number, default: 1 },
+      estimatedDemandUnits: { type: Number, default: 0 },
+      demandUnitLabel: { type: String },
+      groupedWith: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Incident' }],
+      instructionByLanguage: {
+        english: { type: String },
+        hindi: { type: String },
+        marathi: { type: String },
+      },
+      plannedAt: { type: Date },
+    },
     outcomeLearning: {
       actualResolutionMinutes: { type: Number },
       success: { type: Boolean },

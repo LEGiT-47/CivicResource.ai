@@ -36,6 +36,56 @@ const cleanupLegacyUserIndexes = async () => {
   }
 };
 
+const inferServiceCapabilities = (resource) => {
+  const text = `${resource?.name || ''} ${resource?.type || ''}`.toLowerCase();
+
+  if (/(water|tanker|drainage|flood)/.test(text)) {
+    return {
+      waterLitersCapacity: 9000,
+      wasteKgCapacity: 0,
+      maxStopsPerTrip: 5,
+      refillMinutes: 28,
+      crewSize: 3,
+      serviceRadiusKm: 7,
+      shiftRemainingMinutes: 300,
+    };
+  }
+
+  if (/(garbage|waste|trash|sanitation)/.test(text)) {
+    return {
+      waterLitersCapacity: 0,
+      wasteKgCapacity: 4200,
+      maxStopsPerTrip: 6,
+      refillMinutes: 22,
+      crewSize: 4,
+      serviceRadiusKm: 6,
+      shiftRemainingMinutes: 280,
+    };
+  }
+
+  if (/(road|repair|maintenance|public works|public_works|unit|service)/.test(text)) {
+    return {
+      waterLitersCapacity: 1200,
+      wasteKgCapacity: 1200,
+      maxStopsPerTrip: 4,
+      refillMinutes: 18,
+      crewSize: 3,
+      serviceRadiusKm: 8,
+      shiftRemainingMinutes: 260,
+    };
+  }
+
+  return {
+    waterLitersCapacity: 0,
+    wasteKgCapacity: 0,
+    maxStopsPerTrip: 3,
+    refillMinutes: 15,
+    crewSize: 2,
+    serviceRadiusKm: 5,
+    shiftRemainingMinutes: 240,
+  };
+};
+
 const seedData = async () => {
   try {
     await mongoose.connection.asPromise();
@@ -218,7 +268,7 @@ const seedData = async () => {
       { name: 'Ambulance AMB-09', type: 'medical', status: 'patrol', location: { lat: 19.02, lng: 72.85 }, batteryOrFuelLevel: 76 },
       { name: 'Road Repair Unit RR-31', type: 'public_works', status: 'maintenance', location: { lat: 19.09, lng: 72.89 }, batteryOrFuelLevel: 68 },
       { name: 'Public Works Van PW-08', type: 'public_works', status: 'patrol', location: { lat: 19.13, lng: 72.84 }, batteryOrFuelLevel: 88 }
-    ]);
+    ].map((resource) => ({ ...resource, serviceCapabilities: inferServiceCapabilities(resource) })));
 
     const extraResources = await Resource.create([
       { name: 'Garbage Truck GT-31', type: 'public_works', status: 'patrol', location: { lat: 19.08, lng: 72.83 }, batteryOrFuelLevel: 86 },
@@ -235,7 +285,7 @@ const seedData = async () => {
       { name: 'Garbage Truck GT-44 Malad', type: 'public_works', status: 'patrol', location: { lat: 19.1862, lng: 72.8421 }, batteryOrFuelLevel: 88 },
       { name: 'Water Tanker WT-33 Goregaon', type: 'public_works', status: 'patrol', location: { lat: 19.1618, lng: 72.8512 }, batteryOrFuelLevel: 92 },
       { name: 'Water Tanker WT-34 Malad', type: 'public_works', status: 'patrol', location: { lat: 19.1901, lng: 72.8397 }, batteryOrFuelLevel: 89 }
-    ]);
+    ].map((resource) => ({ ...resource, serviceCapabilities: inferServiceCapabilities(resource) })));
 
     const personnel = await Personnel.create([
       // Police Officers (2)

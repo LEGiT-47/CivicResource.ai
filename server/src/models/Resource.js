@@ -35,6 +35,15 @@ const resourceSchema = mongoose.Schema(
       required: true,
       default: 100,
     },
+    serviceCapabilities: {
+      waterLitersCapacity: { type: Number, default: 0 },
+      wasteKgCapacity: { type: Number, default: 0 },
+      maxStopsPerTrip: { type: Number, default: 3 },
+      refillMinutes: { type: Number, default: 20 },
+      crewSize: { type: Number, default: 2 },
+      serviceRadiusKm: { type: Number, default: 6 },
+      shiftRemainingMinutes: { type: Number, default: 240 },
+    },
   },
   {
     timestamps: true,

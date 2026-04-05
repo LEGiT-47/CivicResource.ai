@@ -9,6 +9,32 @@ import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
+const toCsvCell = (value: unknown) => {
+    const normalized = value == null ? "" : String(value);
+    return `"${normalized.replace(/"/g, '""')}"`;
+};
+
+const downloadCsv = (rows: Record<string, unknown>[], fileName: string) => {
+    if (!rows.length) {
+        toast.info("No records to export");
+        return;
+    }
+
+    const headers = Object.keys(rows[0]);
+    const lines = [
+        headers.map((h) => toCsvCell(h)).join(','),
+        ...rows.map((row) => headers.map((h) => toCsvCell(row[h])).join(',')),
+    ];
+    const csv = lines.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    URL.revokeObjectURL(url);
+};
+
 export default function ReportsArchive() {
   const [reports, setReports] = useState<any[]>([]);
     const [personnel, setPersonnel] = useState<any[]>([]);
@@ -38,10 +64,19 @@ export default function ReportsArchive() {
   }, []);
 
   const filteredReports = reports.filter(r => {
-    if (filter !== "all" && r.status !== filter) return false;
+        if (filter === "cluster" && !r?.clustering?.clusterId) return false;
+        if (filter !== "all" && filter !== "cluster" && r.status !== filter) return false;
     if (search && !r.title.toLowerCase().includes(search.toLowerCase())) return false;
     return true;
   });
+
+    const getClusterMembers = (report: any) => {
+        const clusterId = report?.clustering?.clusterId;
+        if (!clusterId) return [];
+        return (reports || [])
+            .filter((item: any) => item?.clustering?.clusterId === clusterId)
+            .sort((a: any, b: any) => Number(a?.clustering?.stopOrder || 1) - Number(b?.clustering?.stopOrder || 1));
+    };
 
     const getAssignedDisplayNames = (report: any) => {
         const rawAssigned = [
@@ -72,6 +107,24 @@ export default function ReportsArchive() {
 
         return Array.from(new Set(resolvedNames)).join(", ");
     };
+
+    const reportToCsvRow = (report: any) => ({
+        id: report._id,
+        title: report.title,
+        type: report.type,
+        severity: report.severity,
+        status: report.status,
+        dispatchStatus: report.dispatchStatus,
+        verificationMode: report.verificationMode,
+        trustScore: report.trustScore,
+        assignedPersonnel: getAssignedDisplayNames(report),
+        assignedResources: getAssignedResourceNames(report),
+        address: report.location?.address || '',
+        latitude: report.location?.lat,
+        longitude: report.location?.lng,
+        createdAt: report.createdAt,
+        updatedAt: report.updatedAt,
+    });
 
   return (
     <div className="flex flex-col h-screen bg-slate-50/30 overflow-hidden font-inter">
@@ -108,14 +161,11 @@ export default function ReportsArchive() {
                     </div>
                                         <button
                                             onClick={() => {
-                                                const blob = new Blob([JSON.stringify(filteredReports, null, 2)], { type: 'application/json' });
-                                                const url = URL.createObjectURL(blob);
-                                                const link = document.createElement('a');
-                                                link.href = url;
-                                                link.download = `civic-reports-${Date.now()}.json`;
-                                                link.click();
-                                                URL.revokeObjectURL(url);
-                                                toast.success("Archive exported");
+                                                downloadCsv(
+                                                    filteredReports.map((report: any) => reportToCsvRow(report)),
+                                                    `civic-reports-${Date.now()}.csv`
+                                                );
+                                                toast.success("Archive exported as CSV");
                                             }}
                                             className="p-3 bg-slate-50 rounded-xl border border-border/40 hover:text-primary transition-all shadow-sm"
                                         >
@@ -135,7 +185,7 @@ export default function ReportsArchive() {
                         />
                     </div>
                     <div className="flex bg-slate-50 p-1.5 rounded-2xl border border-border/40">
-                        {['all', 'active', 'resolved'].map(t => (
+                        {['all', 'active', 'resolved', 'cluster'].map(t => (
                             <button 
                                 key={t}
                                 onClick={() => setFilter(t)}
@@ -186,6 +236,11 @@ export default function ReportsArchive() {
                                     {report.type?.[0]?.toUpperCase() || 'I'}
                                 </div>
                                 <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{report.type}</span>
+                                {report?.clustering?.clusterId && (
+                                    <span className="text-[9px] font-black text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-full uppercase tracking-widest">
+                                        Cluster {report?.clustering?.clusterId} formed {report?.clustering?.stopOrder || 1}/{report?.clustering?.totalStops || 1}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex items-center gap-2 text-[10px] font-black text-slate-400">
                                 <Clock className="w-3 h-3" />
@@ -215,13 +270,8 @@ export default function ReportsArchive() {
                             </div>
                             <button
                                 onClick={() => {
-                                    const blob = new Blob([JSON.stringify(selectedReport, null, 2)], { type: 'application/json' });
-                                    const url = URL.createObjectURL(blob);
-                                    const link = document.createElement('a');
-                                    link.href = url;
-                                    link.download = `incident-${selectedReport._id}.json`;
-                                    link.click();
-                                    URL.revokeObjectURL(url);
+                                    downloadCsv([reportToCsvRow(selectedReport)], `incident-${selectedReport._id}.csv`);
+                                    toast.success("Incident exported as CSV");
                                 }}
                                 className="w-14 h-14 bg-white border border-border/40 rounded-2xl flex items-center justify-center shadow-sm hover:text-primary transition-all"
                             >
@@ -247,6 +297,47 @@ export default function ReportsArchive() {
                                 Last Updated: {selectedReport.updatedAt ? new Date(selectedReport.updatedAt).toLocaleString() : 'N/A'}
                             </p>
                         </div>
+
+                        {selectedReport?.clustering?.clusterId && (
+                            <div className="bg-white border border-indigo-200 rounded-2xl p-8 space-y-5">
+                                <div>
+                                    <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-700">Cluster Summary</h3>
+                                    <p className="text-[11px] font-black uppercase tracking-widest text-slate-700 mt-2">
+                                        Cluster {selectedReport.clustering.clusterId} formed {selectedReport?.clustering?.stopOrder || 1}/{selectedReport?.clustering?.totalStops || 1}
+                                    </p>
+                                </div>
+                                <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                                    Cluster ID: {selectedReport.clustering.clusterId}
+                                </p>
+                                <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                                    Active Stop: {selectedReport?.clustering?.stopOrder || 1}/{selectedReport?.clustering?.totalStops || 1}
+                                </p>
+                                <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                                    Cluster Assignee: {getAssignedDisplayNames(selectedReport)}
+                                </p>
+                                <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">
+                                    Cluster Resource: {getAssignedResourceNames(selectedReport)}
+                                </p>
+
+                                <div className="space-y-3 pt-2">
+                                    {getClusterMembers(selectedReport).map((member: any) => (
+                                        <div key={member._id} className="rounded-xl border border-indigo-100 bg-indigo-50/40 px-4 py-3">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <p className="text-[11px] font-black uppercase tracking-wider text-slate-900">
+                                                    {member?.clustering?.stopOrder || 1}. {member.title}
+                                                </p>
+                                                <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                    {member.severity}
+                                                </span>
+                                            </div>
+                                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">
+                                                {member.location?.address || 'Address unavailable'}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </motion.div>
                 ) : (
                     <div className="h-full flex flex-col items-center justify-center p-20 text-center space-y-10 group">

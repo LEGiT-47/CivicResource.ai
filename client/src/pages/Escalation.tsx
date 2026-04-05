@@ -9,6 +9,29 @@ import { cn } from "@/lib/utils";
 import api from "@/lib/api";
 import { toast } from "sonner";
 
+const toCsvCell = (value: unknown) => `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+const downloadGovernanceCsv = (rows: Record<string, unknown>[], fileName: string) => {
+  if (!rows.length) {
+    toast.info("No records to export");
+    return;
+  }
+
+  const headers = Object.keys(rows[0]);
+  const csv = [
+    headers.map((h) => toCsvCell(h)).join(','),
+    ...rows.map((row) => headers.map((h) => toCsvCell(row[h])).join(',')),
+  ].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(url);
+};
+
 const severityColors = {
   critical: "text-primary border-primary/20 bg-primary/5",
   high: "text-amber-500 border-amber-500/20 bg-amber-500/5",
@@ -232,20 +255,23 @@ export default function Escalation() {
                 </button>
                 <button
                   onClick={() => {
-                    const payload = {
-                      generatedAt: new Date().toISOString(),
+                    const generatedAt = new Date().toISOString();
+                    const rows = filtered.map((incident: any) => ({
+                      generatedAt,
                       filter,
                       searchTerm,
-                      totalRecords: filtered.length,
-                      incidents: filtered,
-                    };
-                    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `governance-broadcast-${Date.now()}.json`;
-                    link.click();
-                    URL.revokeObjectURL(url);
+                      protocolId: incident._id,
+                      title: incident.title,
+                      severity: incident.severity,
+                      status: incident.status,
+                      type: incident.type,
+                      address: incident.location?.address || '',
+                      slaPercent: incident.slaPercent ?? 45,
+                      slaDeadline: incident.slaDeadline || '2H 15M',
+                      createdAt: incident.createdAt || '',
+                      updatedAt: incident.updatedAt || '',
+                    }));
+                    downloadGovernanceCsv(rows, `governance-broadcast-${Date.now()}.csv`);
                     toast.success(`Broadcast report generated (${filtered.length} records)`);
                   }}
                   className="flex items-center gap-3 px-8 py-5 rounded-2xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.3em] hover:bg-black transition-all shadow-plinth active:scale-95"

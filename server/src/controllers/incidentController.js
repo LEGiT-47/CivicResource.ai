@@ -28,7 +28,7 @@ const COORD_FALLBACK = {
 
 const buildTrackingId = () => `CF-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
 
-const PUBLIC_FIELDS = 'title type severity location status dispatchStatus createdAt updatedAt trackingId details detailsEnglish sourceLanguage titleOriginal detailsOriginal titleEnglish aiPredictionConfidence verificationMode trustScore aiTriage fusion sla workflow outcomeLearning';
+const PUBLIC_FIELDS = 'title type severity location status dispatchStatus createdAt updatedAt trackingId details detailsEnglish sourceLanguage titleOriginal detailsOriginal titleEnglish aiPredictionConfidence verificationMode trustScore aiTriage fusion sla workflow clustering outcomeLearning';
 
 const roundNumber = (value, digits = 1) => {
   const n = Number(value);

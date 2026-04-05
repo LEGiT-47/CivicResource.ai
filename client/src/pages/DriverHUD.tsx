@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Navigation, MapPin, AlertCircle, Clock, 
   CheckCircle, Shield, Truck, Zap, Phone,
-   ArrowRight, Activity, Radio, Signal, Info, Search, AlertTriangle
+   ArrowRight, Activity, Radio, Signal, Info, Search, AlertTriangle, Route
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import api from "@/lib/api";
@@ -29,6 +29,21 @@ const formatCountdown = (seconds: number) => {
    const minutes = Math.floor(total / 60).toString().padStart(2, '0');
    const remaining = (total % 60).toString().padStart(2, '0');
    return `${minutes}:${remaining}`;
+};
+
+const isIncidentClosed = (incident: any) =>
+   Boolean(incident && (incident.status === 'resolved' || incident.dispatchStatus === 'completed'));
+
+const getClusterId = (incident: any) => String(incident?.clustering?.clusterId || '').trim();
+
+const getStopOrder = (incident: any) => Number(incident?.clustering?.stopOrder || Number.MAX_SAFE_INTEGER);
+
+const sortByClusterStop = (a: any, b: any) => getStopOrder(a) - getStopOrder(b);
+
+const getCurrentClusterStop = (clusterIncidents: any[]) => {
+   if (!Array.isArray(clusterIncidents) || clusterIncidents.length === 0) return null;
+   const sorted = [...clusterIncidents].sort(sortByClusterStop);
+   return sorted.find((incident) => !isIncidentClosed(incident)) || sorted[0];
 };
 
 const vehicleEmojiByType: Record<string, string> = {
@@ -191,6 +206,22 @@ export default function DriverHUD() {
    const activeIncidentIdRef = useRef<string | null>(null);
 
    const selectIncident = (incident: any | null) => {
+      if (!incident) {
+         setActiveIncident(null);
+         activeIncidentIdRef.current = null;
+         return;
+      }
+
+      const clusterId = getClusterId(incident);
+      if (clusterId) {
+         const clusterStops = incidents.filter((item) => getClusterId(item) === clusterId);
+         const currentStop = getCurrentClusterStop(clusterStops);
+         const nextIncident = currentStop || incident;
+         setActiveIncident(nextIncident);
+         activeIncidentIdRef.current = nextIncident?._id || null;
+         return;
+      }
+
       setActiveIncident(incident);
       activeIncidentIdRef.current = incident?._id || null;
    };
@@ -270,10 +301,16 @@ export default function DriverHUD() {
 
    const handleInitializeRoute = async () => {
       if (!activeIncident) return;
+      const activeClusterId = getClusterId(activeIncident);
+      const activeClusterStops = activeClusterId
+         ? incidents.filter((incident) => getClusterId(incident) === activeClusterId)
+         : [];
+      const targetIncident = activeClusterStops.length > 1 ? getCurrentClusterStop(activeClusterStops) : activeIncident;
+      if (!targetIncident) return;
       setIsRouting(true);
       try {
          const { data } = await api.post('/dispatch/start-journey-simulation', {
-            incidentId: activeIncident._id,
+            incidentId: targetIncident._id,
             intervalMinutes: 1,
             timeScale: 0.1,
             speedKmph: 32,
@@ -290,9 +327,15 @@ export default function DriverHUD() {
 
    const handleMarkResolved = async () => {
       if (!activeIncident) return;
+      const activeClusterId = getClusterId(activeIncident);
+      const activeClusterStops = activeClusterId
+         ? incidents.filter((incident) => getClusterId(incident) === activeClusterId)
+         : [];
+      const targetIncident = activeClusterStops.length > 1 ? getCurrentClusterStop(activeClusterStops) : activeIncident;
+      if (!targetIncident) return;
       setIsCompleting(true);
       try {
-         await api.put(`/incidents/${activeIncident._id}/status`, { status: 'resolved' });
+         await api.put(`/incidents/${targetIncident._id}/status`, { status: 'resolved' });
          toast.success("Incident marked resolved. Checking for next task...");
          await refreshAssignments();
       } catch (err) {
@@ -334,6 +377,43 @@ export default function DriverHUD() {
       );
    });
 
+   const activeClusterId = getClusterId(activeIncident);
+   const activeClusterStops = activeClusterId
+      ? incidents.filter((incident) => getClusterId(incident) === activeClusterId).sort(sortByClusterStop)
+      : [];
+   const activeClusterCurrentStop = getCurrentClusterStop(activeClusterStops);
+   const isClusterFlowActive = activeClusterStops.length > 1;
+   const isCurrentClusterStopSelected = !isClusterFlowActive || activeIncident?._id === activeClusterCurrentStop?._id;
+
+   const registryIncidents = (() => {
+      const items: any[] = [];
+      const visitedClusters = new Set<string>();
+
+      for (const incident of filteredIncidents) {
+         const clusterId = getClusterId(incident);
+         if (!clusterId) {
+            items.push(incident);
+            continue;
+         }
+
+         if (visitedClusters.has(clusterId)) continue;
+         visitedClusters.add(clusterId);
+
+         const clusterMembers = filteredIncidents
+            .filter((item) => getClusterId(item) === clusterId)
+            .sort(sortByClusterStop);
+         const representative = getCurrentClusterStop(clusterMembers) || clusterMembers[0] || incident;
+
+         items.push({
+            ...representative,
+            __clusterMembers: clusterMembers,
+            __isClusterCard: clusterMembers.length > 1,
+         });
+      }
+
+      return items;
+   })();
+
    const trackingEta = Number(activeIncident?.tracking?.currentLocation?.etaMinutes);
    const trackingEtaSeconds = Number(activeIncident?.tracking?.currentLocation?.etaSeconds);
    const trackingPhase = String(activeIncident?.tracking?.currentLocation?.phase || activeIncident?.dispatchStatus || '').toLowerCase();
@@ -351,8 +431,8 @@ export default function DriverHUD() {
          : null;
    const isResolved = Boolean(activeIncident && (activeIncident.status === 'resolved' || activeIncident.dispatchStatus === 'completed'));
    const isEngaged = Boolean(activeIncident && (activeIncident.status === 'investigating' || activeIncident.dispatchStatus === 'on-site' || activeIncident.dispatchStatus === 'resolving'));
-   const canInitialize = Boolean(activeIncident) && !isResolved && !isEngaged;
-   const canResolve = Boolean(activeIncident) && !isResolved && isEngaged;
+   const canInitialize = Boolean(activeIncident) && !isResolved && !isEngaged && isCurrentClusterStopSelected;
+   const canResolve = Boolean(activeIncident) && !isResolved && isEngaged && isCurrentClusterStopSelected;
    const etaBaseMinutes = Number.isFinite(trackingEta) ? trackingEta : fallbackEtaMinutes;
    const lastEtaSampleAt = activeIncident?.tracking?.currentLocation?.at ? new Date(activeIncident.tracking.currentLocation.at).getTime() : Date.now();
    const elapsedSinceSampleMinutes = Math.max(0, (Date.now() - lastEtaSampleAt) / 60000);
@@ -438,6 +518,36 @@ export default function DriverHUD() {
                            <p className="text-[11px] font-bold opacity-80 uppercase leading-relaxed tracking-wider">{activeIncident.details || 'No additional field notes provided.'}</p>
                         </div>
                      </div>
+                     {activeIncident?.clustering?.clusterId && (
+                        <div className="flex items-start gap-4 p-6 rounded-3xl bg-primary/15 border border-primary/30 backdrop-blur-md">
+                           <Route className="w-6 h-6 text-primary mt-1 shrink-0" />
+                           <div>
+                              <p className="text-[9px] font-black uppercase tracking-[0.4em] text-primary mb-1">Cluster Runbook</p>
+                              <p className="text-[11px] font-bold opacity-90 uppercase leading-relaxed tracking-wider">
+                                {activeIncident?.clustering?.instructionByLanguage?.english || `Cluster ${activeIncident?.clustering?.clusterId} stop ${activeIncident?.clustering?.stopOrder || 1}/${activeIncident?.clustering?.totalStops || 1}`}
+                              </p>
+                              {isClusterFlowActive && (
+                                 <div className="mt-4 grid grid-cols-1 gap-2">
+                                    {activeClusterStops.map((stop: any) => {
+                                       const isClosed = isIncidentClosed(stop);
+                                       const isCurrent = activeClusterCurrentStop?._id === stop._id && !isClosed;
+                                       return (
+                                          <div
+                                             key={stop._id}
+                                             className={cn(
+                                                "rounded-xl border px-3 py-2 text-[9px] font-black uppercase tracking-widest",
+                                                isCurrent ? "border-primary bg-primary/20 text-white" : isClosed ? "border-emerald-300 bg-emerald-500/20 text-emerald-100" : "border-white/20 bg-white/5 text-white/70"
+                                             )}
+                                          >
+                                             Stop {stop?.clustering?.stopOrder || 1}: {stop.title}
+                                          </div>
+                                       );
+                                    })}
+                                 </div>
+                              )}
+                           </div>
+                        </div>
+                     )}
                   </div>
                </div>
 
@@ -447,7 +557,7 @@ export default function DriverHUD() {
                               disabled={isRouting || !canInitialize}
                               className="flex-1 py-6 rounded-2xl bg-white text-slate-900 text-[10px] font-black uppercase tracking-[0.3em] shadow-2xl transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                               <Navigation className="w-4 h-4" /> {isRouting ? 'Routing...' : 'Initialize Route'}
+                                              <Navigation className="w-4 h-4" /> {isRouting ? 'Routing...' : isClusterFlowActive ? `Initialize Stop ${activeIncident?.clustering?.stopOrder || 1}` : 'Initialize Route'}
                   </button>
                   <button
                     onClick={handleControlRoomCall}
@@ -516,7 +626,7 @@ export default function DriverHUD() {
                        disabled={isCompleting || !canResolve}
                        className="w-full py-4 rounded-2xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-[0.3em] shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                       {isCompleting ? 'Completing...' : 'Mark Incident Resolved'}
+                       {isCompleting ? 'Completing...' : isClusterFlowActive ? `Resolve Stop ${activeIncident?.clustering?.stopOrder || 1}` : 'Mark Incident Resolved'}
                     </button>
                  )}
                </div>
@@ -575,7 +685,7 @@ export default function DriverHUD() {
          </div>
 
          <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar">
-            {filteredIncidents.map((incident) => (
+            {registryIncidents.map((incident: any) => (
               <motion.button
                 key={incident._id}
                 whileHover={{ scale: 1.02, x: 5 }}
@@ -599,12 +709,22 @@ export default function DriverHUD() {
                 </div>
                 <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-tight mb-2">{incident.title}</h4>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{incident.location?.address}</p>
+                        {incident.__isClusterCard && (
+                           <div className="mt-3 flex items-center gap-2">
+                              <span className="px-2 py-1 rounded-lg bg-primary/10 text-primary text-[8px] font-black uppercase tracking-widest border border-primary/20">
+                                 Cluster {incident.clustering?.clusterId}
+                              </span>
+                              <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                                 {incident.__clusterMembers?.length || 0} stops
+                              </span>
+                           </div>
+                        )}
                 <div className="mt-8 flex items-center gap-4 text-[9px] font-black text-slate-400 uppercase tracking-widest group">
-                            Load Incident <ArrowRight className="w-3.5 h-3.5" />
+                                          {incident.__isClusterCard ? 'Load Cluster Flow' : 'Load Incident'} <ArrowRight className="w-3.5 h-3.5" />
                 </div>
               </motion.button>
             ))}
-                  {filteredIncidents.length === 0 && (
+                           {registryIncidents.length === 0 && (
                      <div className="rounded-2xl border border-border/40 p-8 text-center">
                         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No incidents match your filter.</p>
                      </div>

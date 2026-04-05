@@ -13,6 +13,7 @@ import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import DispatchSystem from "./pages/DispatchSystem";
+import ClusterOps from "./pages/ClusterOps";
 import ReportsArchive from "./pages/ReportsArchive";
 import PublicArchive from "./pages/PublicArchive";
 import ComplaintTracker from "./pages/ComplaintTracker";
@@ -47,6 +48,7 @@ const App = () => (
           <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
             <Route path="/app/intelligence" element={<AppLayout><IntelligenceHub /></AppLayout>} />
             <Route path="/app/dispatch" element={<AppLayout><DispatchSystem /></AppLayout>} />
+            <Route path="/app/clusters" element={<AppLayout><ClusterOps /></AppLayout>} />
             <Route path="/app/archive" element={<AppLayout><ReportsArchive /></AppLayout>} />
             <Route path="/app/escalation" element={<AppLayout><Escalation /></AppLayout>} />
           </Route>

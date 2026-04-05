@@ -17,11 +17,34 @@ export interface PublicIncident {
   title: string;
   severity: string;
   status: string;
+  dispatchStatus?: string;
+  details?: string;
   trackingId?: string;
   location?: {
     address?: string;
     lat?: number;
     lng?: number;
+  };
+  tracking?: {
+    currentLocation?: {
+      lat?: number;
+      lng?: number;
+      etaMinutes?: number;
+      etaSeconds?: number;
+      phase?: string;
+      at?: string;
+    };
+  };
+  clustering?: {
+    clusterId?: string;
+    serviceFamily?: string;
+    stopOrder?: number;
+    totalStops?: number;
+    instructionByLanguage?: {
+      english?: string;
+      hindi?: string;
+      marathi?: string;
+    };
   };
   createdAt?: string;
   updatedAt?: string;

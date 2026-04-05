@@ -31,11 +31,21 @@ MODEL_PATH = os.path.join(MODEL_DIR, "demand_ensemble.joblib")
 DATASET_PATH = os.path.join(os.path.dirname(__file__), "data", "historical_demand.csv")
 TRIAGE_MODEL_PATH = os.path.join(MODEL_DIR, "complaint_triage.joblib")
 TRIAGE_DATASET_PATH = os.path.join(os.path.dirname(__file__), "data", "complaint_triage.csv")
+CLUSTER_MODEL_PATH = os.path.join(MODEL_DIR, "cluster_feasibility.joblib")
+CLUSTER_DATASET_PATH = os.path.join(os.path.dirname(__file__), "data", "cluster_feasibility.csv")
 
 rf_model = None
 gb_model = None
 triage_intent_model = None
 triage_fake_model = None
+cluster_feasibility_model = None
+cluster_feasibility_meta = {
+    "trained": False,
+    "source": "fallback",
+    "rows": 0,
+    "mae": None,
+    "r2": None,
+}
 model_meta = {
     "trained": False,
     "source": "fallback",
@@ -162,6 +172,33 @@ class ComplaintTriageRequest(BaseModel):
     location_address: str = ""
     reporter_phone_present: bool = False
     location_present: bool = True
+
+
+class ClusterFeasibilityRecord(BaseModel):
+    cluster_id: str
+    service_family: str = "general"
+    incident_count: int = Field(ge=1)
+    capacity_units: float = Field(ge=0)
+    demand_units: float = Field(ge=0)
+    utilization_percent: float = Field(ge=0)
+    avg_distance_km: float = Field(ge=0)
+    avg_severity_score: float = Field(ge=0)
+    mixed_family_ratio: float = Field(ge=0, le=1)
+    available_personnel: int = Field(ge=0)
+    resource_available: bool = True
+    shift_remaining_minutes: float = Field(ge=0)
+    refill_minutes: float = Field(ge=0)
+    weather_rain_mm: float = Field(ge=0)
+    traffic_index: float = Field(ge=0)
+    road_condition_index: float = Field(ge=0)
+    family_match_ratio: float = Field(ge=0, le=1)
+    crew_size: int = Field(ge=0)
+    radius_km: float = Field(ge=0)
+    queue_pressure: float = Field(ge=0)
+
+
+class ClusterFeasibilityRequest(BaseModel):
+    clusters: List[ClusterFeasibilityRecord]
 
 
 def severity_score(severity: str):
@@ -474,6 +511,287 @@ def analyze_complaint_intake(payload: ComplaintTriageRequest):
     }
 
 
+def cluster_family_priority(service_family: str):
+    return {
+        "water": 0.95,
+        "garbage": 0.9,
+        "maintenance": 0.82,
+        "general": 0.68,
+        "safety": 0.78,
+    }.get(normalize_need_label(service_family), 0.7)
+
+
+def build_cluster_feature_row(record: ClusterFeasibilityRecord):
+    family = normalize_need_label(record.service_family)
+    radius = max(0.1, float(record.radius_km or 0.1))
+    capacity_units = max(0.1, float(record.capacity_units or 0.1))
+    demand_units = max(0.0, float(record.demand_units or 0.0))
+    utilization = max(0.0, float(record.utilization_percent or 0.0))
+    return {
+        "incident_count": max(1, int(record.incident_count or 1)),
+        "capacity_units": capacity_units,
+        "demand_units": demand_units,
+        "utilization_percent": utilization,
+        "avg_distance_km": max(0.0, float(record.avg_distance_km or 0.0)),
+        "avg_severity_score": max(0.0, float(record.avg_severity_score or 0.0)),
+        "mixed_family_ratio": max(0.0, min(1.0, float(record.mixed_family_ratio or 0.0))),
+        "available_personnel": max(0, int(record.available_personnel or 0)),
+        "resource_available": 1.0 if record.resource_available else 0.0,
+        "shift_remaining_minutes": max(0.0, float(record.shift_remaining_minutes or 0.0)),
+        "refill_minutes": max(0.0, float(record.refill_minutes or 0.0)),
+        "weather_rain_mm": max(0.0, float(record.weather_rain_mm or 0.0)),
+        "traffic_index": max(0.0, float(record.traffic_index or 0.0)),
+        "road_condition_index": max(0.0, float(record.road_condition_index or 0.0)),
+        "family_match_ratio": max(0.0, min(1.0, float(record.family_match_ratio or 0.0))),
+        "crew_size": max(0, int(record.crew_size or 0)),
+        "radius_km": radius,
+        "queue_pressure": max(0.0, float(record.queue_pressure or 0.0)),
+        "stop_density": max(0.0, float(record.incident_count or 1) / radius),
+        "family_priority_score": cluster_family_priority(family),
+    }
+
+
+def cluster_feasibility_target(row: dict):
+    capacity_units = max(0.1, float(row["capacity_units"]))
+    demand_units = max(0.0, float(row["demand_units"]))
+    utilization = max(0.0, float(row["utilization_percent"]))
+    utilization_gap = max(0.0, 100.0 - utilization)
+    under_capacity_bonus = max(0.0, min(1.0, utilization_gap / 100.0))
+    cap_ratio = min(1.8, demand_units / capacity_units)
+    severity = max(0.0, float(row["avg_severity_score"])) / 100.0
+    resource_bonus = 8.0 if float(row["resource_available"]) > 0 else -12.0
+    personnel_bonus = min(14.0, float(row["available_personnel"]) * 3.8)
+    family_bonus = float(row["family_priority_score"]) * 12.0
+    match_bonus = float(row["family_match_ratio"]) * 14.0
+    distance_penalty = float(row["avg_distance_km"]) * 4.2
+    crowd_penalty = max(0.0, float(row["mixed_family_ratio"]) - 0.2) * 22.0
+    queue_penalty = float(row["queue_pressure"]) * 10.0
+    weather_penalty = float(row["weather_rain_mm"]) * 0.2
+    traffic_penalty = max(0.0, float(row["traffic_index"]) - 1.0) * 10.0
+    road_penalty = max(0.0, float(row["road_condition_index"]) - 1.0) * 8.0
+    refill_penalty = max(0.0, float(row["refill_minutes"]) - 15.0) * 0.2
+    shift_bonus = min(10.0, float(row["shift_remaining_minutes"]) / 45.0)
+    crew_bonus = min(8.0, float(row["crew_size"]) * 1.6)
+    stop_pressure = max(0.0, float(row["stop_density"]) - 0.5) * 8.0
+    overload_penalty = max(0.0, (cap_ratio - 1.0) * 35.0)
+
+    raw_score = (
+        52.0
+        + family_bonus
+        + match_bonus
+        + under_capacity_bonus * 18.0
+        + resource_bonus
+        + personnel_bonus
+        + shift_bonus
+        + crew_bonus
+        + severity * 12.0
+        - distance_penalty
+        - crowd_penalty
+        - queue_penalty
+        - weather_penalty
+        - traffic_penalty
+        - road_penalty
+        - refill_penalty
+        - stop_pressure
+        - overload_penalty
+    )
+    return float(max(0.0, min(100.0, raw_score)))
+
+
+def build_synthetic_cluster_dataset(sample_count: int = 1200):
+    rng = np.random.default_rng(42)
+    families = ["water", "garbage", "maintenance", "general", "safety"]
+    rows = []
+
+    for _ in range(sample_count):
+        family = str(rng.choice(families))
+        incident_count = int(rng.integers(1, 8))
+        radius_km = float(rng.uniform(1.0, 8.0))
+        capacity_units = float(rng.uniform(500.0, 12000.0) if family == "water" else rng.uniform(250.0, 9000.0) if family == "garbage" else rng.uniform(1.0, 6.0))
+        family_match_ratio = float(rng.uniform(0.45, 1.0) if family != "general" else rng.uniform(0.2, 0.85))
+        mixed_family_ratio = float(rng.uniform(0.0, 0.75 if family == "general" else 0.45))
+        available_personnel = int(rng.integers(0, 5))
+        resource_available = bool(rng.integers(0, 2))
+        shift_remaining_minutes = float(rng.uniform(30.0, 360.0))
+        refill_minutes = float(rng.uniform(10.0, 45.0))
+        weather_rain_mm = float(rng.uniform(0.0, 45.0))
+        traffic_index = float(rng.uniform(0.85, 1.8))
+        road_condition_index = float(rng.uniform(0.8, 1.5))
+        crew_size = int(rng.integers(1, 7))
+        avg_distance_km = float(rng.uniform(0.15, radius_km))
+        avg_severity_score = float(rng.uniform(20.0, 100.0))
+        queue_pressure = float(rng.uniform(0.0, 2.2))
+
+        demand_units = float(
+            capacity_units
+            * rng.uniform(0.35, 1.55)
+            * (1.0 + mixed_family_ratio * 0.4)
+            * (1.0 + max(0.0, traffic_index - 1.0) * 0.15)
+        )
+        utilization_percent = float((demand_units / max(1.0, capacity_units)) * 100.0)
+
+        row = {
+            "incident_count": incident_count,
+            "capacity_units": capacity_units,
+            "demand_units": demand_units,
+            "utilization_percent": utilization_percent,
+            "avg_distance_km": avg_distance_km,
+            "avg_severity_score": avg_severity_score,
+            "mixed_family_ratio": mixed_family_ratio,
+            "available_personnel": available_personnel,
+            "resource_available": resource_available,
+            "shift_remaining_minutes": shift_remaining_minutes,
+            "refill_minutes": refill_minutes,
+            "weather_rain_mm": weather_rain_mm,
+            "traffic_index": traffic_index,
+            "road_condition_index": road_condition_index,
+            "family_match_ratio": family_match_ratio,
+            "crew_size": crew_size,
+            "radius_km": radius_km,
+            "queue_pressure": queue_pressure,
+            "stop_density": incident_count / max(0.1, radius_km),
+            "family_priority_score": cluster_family_priority(family),
+        }
+        row["feasibility_score"] = cluster_feasibility_target(row) + float(rng.normal(0, 4.5))
+        row["feasibility_score"] = max(0.0, min(100.0, row["feasibility_score"]))
+        rows.append(row)
+
+    return pd.DataFrame(rows)
+
+
+def train_grouping_feasibility_model(dataset_path: str | None = None):
+    global cluster_feasibility_model, cluster_feasibility_meta
+
+    data = None
+    resolved_dataset_path = dataset_path or CLUSTER_DATASET_PATH
+    training_source = 'synthetic-cluster-dataset'
+    if resolved_dataset_path and os.path.exists(resolved_dataset_path):
+        candidate = pd.read_csv(resolved_dataset_path)
+        required_cols = [
+            "incident_count",
+            "capacity_units",
+            "demand_units",
+            "utilization_percent",
+            "avg_distance_km",
+            "avg_severity_score",
+            "mixed_family_ratio",
+            "available_personnel",
+            "resource_available",
+            "shift_remaining_minutes",
+            "refill_minutes",
+            "weather_rain_mm",
+            "traffic_index",
+            "road_condition_index",
+            "family_match_ratio",
+            "crew_size",
+            "radius_km",
+            "queue_pressure",
+            "stop_density",
+            "family_priority_score",
+            "feasibility_score",
+        ]
+        if all(col in candidate.columns for col in required_cols):
+            data = candidate[required_cols].copy()
+            training_source = 'cluster-dataset'
+
+    if data is None:
+        data = build_synthetic_cluster_dataset()
+
+    x = data.drop(columns=["feasibility_score"])
+    y = data["feasibility_score"]
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+
+    rf = RandomForestRegressor(n_estimators=220, random_state=42)
+    gb = GradientBoostingRegressor(random_state=42, n_estimators=260, learning_rate=0.04)
+    rf.fit(x_train, y_train)
+    gb.fit(x_train, y_train)
+
+    predictions = 0.58 * rf.predict(x_test) + 0.42 * gb.predict(x_test)
+    mae = float(mean_absolute_error(y_test, predictions))
+    r2 = float(r2_score(y_test, predictions))
+
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    joblib.dump(
+        {
+            "rf": rf,
+            "gb": gb,
+            "features": list(x.columns),
+            "meta": {
+                "rows": int(len(data)),
+                "mae": mae,
+                "r2": r2,
+                "dataset_path": resolved_dataset_path if os.path.exists(resolved_dataset_path) else "synthetic",
+            },
+        },
+        CLUSTER_MODEL_PATH,
+    )
+
+    cluster_feasibility_model = {"rf": rf, "gb": gb, "features": list(x.columns)}
+    cluster_feasibility_meta = {
+        "trained": True,
+        "source": training_source,
+        "rows": int(len(data)),
+        "mae": round(mae, 4),
+        "r2": round(r2, 4),
+        "dataset_path": resolved_dataset_path if training_source == 'cluster-dataset' else 'synthetic',
+    }
+    return cluster_feasibility_meta
+
+
+def load_persisted_cluster_model():
+    global cluster_feasibility_model, cluster_feasibility_meta
+
+    if not os.path.exists(CLUSTER_MODEL_PATH):
+        return False
+
+    bundle = joblib.load(CLUSTER_MODEL_PATH)
+    rf = bundle.get("rf")
+    gb = bundle.get("gb")
+    bundle_meta = bundle.get("meta", {})
+    cluster_feasibility_model = {"rf": rf, "gb": gb, "features": bundle.get("features", [])}
+    cluster_feasibility_meta = {
+        "trained": True,
+        "source": "persisted-model",
+        "rows": int(bundle_meta.get("rows", 0)),
+        "mae": bundle_meta.get("mae"),
+        "r2": bundle_meta.get("r2"),
+    }
+    return rf is not None and gb is not None
+
+
+def predict_cluster_feasibility(record: ClusterFeasibilityRecord):
+    feature_row = build_cluster_feature_row(record)
+    model_bundle = cluster_feasibility_model
+
+    if model_bundle is None or model_bundle.get("rf") is None or model_bundle.get("gb") is None:
+        fallback_score = cluster_feasibility_target(feature_row)
+        return {
+            "cluster_id": record.cluster_id,
+            "feasibility_score": round(fallback_score, 1),
+            "feasibility_probability": round(max(0.0, min(1.0, fallback_score / 100.0)), 3),
+            "source": "heuristic-fallback",
+        }
+
+    x = pd.DataFrame([feature_row], columns=model_bundle.get("features") or list(feature_row.keys()))
+    rf_score = float(model_bundle["rf"].predict(x)[0])
+    gb_score = float(model_bundle["gb"].predict(x)[0])
+    blended = 0.58 * rf_score + 0.42 * gb_score
+    blended = max(0.0, min(100.0, blended))
+    return {
+        "cluster_id": record.cluster_id,
+        "feasibility_score": round(blended, 1),
+        "feasibility_probability": round(blended / 100.0, 3),
+        "source": "trained-model",
+        "signals": {
+            "utilization_percent": round(feature_row["utilization_percent"], 1),
+            "avg_distance_km": round(feature_row["avg_distance_km"], 2),
+            "family_priority_score": round(feature_row["family_priority_score"], 2),
+            "family_match_ratio": round(feature_row["family_match_ratio"], 2),
+            "queue_pressure": round(feature_row["queue_pressure"], 2),
+        },
+    }
+
+
 def train_demand_models(zones: List[DemandZone]):
     x_train = []
     y_train = []
@@ -591,6 +909,12 @@ try:
 except Exception as triage_bootstrap_error:
     print(f"Complaint triage bootstrap warning: {triage_bootstrap_error}")
 
+try:
+    if not load_persisted_cluster_model():
+        train_grouping_feasibility_model(CLUSTER_DATASET_PATH)
+except Exception as cluster_bootstrap_error:
+    print(f"Cluster feasibility bootstrap warning: {cluster_bootstrap_error}")
+
 
 def score_zones(zones: List[DemandZone]):
     if not zones:
@@ -644,7 +968,13 @@ def score_zones(zones: List[DemandZone]):
 
 @app.get("/")
 async def root():
-    return {"status": "online", "engine": "CivicFlow-AI-v3", "model": model_meta, "triage_model": triage_meta}
+    return {
+        "status": "online",
+        "engine": "CivicFlow-AI-v3",
+        "model": model_meta,
+        "triage_model": triage_meta,
+        "cluster_model": cluster_feasibility_meta,
+    }
 
 
 @app.get("/model/status")
@@ -686,6 +1016,26 @@ async def train_triage_model(request: ModelTrainRequest):
         "model": meta,
     }
 
+
+@app.get("/model/cluster-status")
+async def cluster_status():
+    return {
+        "model_path": CLUSTER_MODEL_PATH,
+        "dataset_path": CLUSTER_DATASET_PATH,
+        "model": cluster_feasibility_meta,
+    }
+
+
+@app.post("/model/train-clustering")
+async def train_cluster_model(request: ModelTrainRequest):
+    dataset_path = request.dataset_path or CLUSTER_DATASET_PATH
+    meta = train_grouping_feasibility_model(dataset_path)
+    return {
+        "message": "Cluster feasibility model trained successfully",
+        "dataset_path": dataset_path,
+        "model": meta,
+    }
+
 @app.post("/analyze/clustering")
 async def analyze_clusters(request: AnalysisRequest):
     if not request.incidents:
@@ -703,6 +1053,32 @@ async def analyze_clusters(request: AnalysisRequest):
         })
     
     return {"clusters": results}
+
+
+@app.post("/analyze/grouping-feasibility")
+async def analyze_grouping_feasibility(request: ClusterFeasibilityRequest):
+    if not request.clusters:
+        return {"clusters": []}
+
+    try:
+        model_bundle = cluster_feasibility_model or {}
+        if model_bundle.get("rf") is None or model_bundle.get("gb") is None:
+            loaded = load_persisted_cluster_model()
+            if not loaded:
+                train_grouping_feasibility_model(CLUSTER_DATASET_PATH)
+    except Exception:
+        # Keep request resilient; per-cluster predictor will still return fallback.
+        pass
+
+    results = [predict_cluster_feasibility(cluster) for cluster in request.clusters]
+    results.sort(key=lambda row: row["feasibility_score"], reverse=True)
+    for index, row in enumerate(results, start=1):
+        row["feasibility_rank"] = index
+
+    return {
+        "clusters": results,
+        "model": cluster_feasibility_meta,
+    }
 
 @app.post("/analyze/heatmap-weights")
 async def calculate_heatmap_weights(request: AnalysisRequest):

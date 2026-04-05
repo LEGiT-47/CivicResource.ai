@@ -10,7 +10,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { Marker, type MapPressEvent } from 'react-native-maps';
+import MapView, { Marker, Polyline, type MapPressEvent } from 'react-native-maps';
 import NetInfo from '@react-native-community/netinfo';
 import { StatusBar } from 'expo-status-bar';
 
@@ -44,6 +44,8 @@ const complaintTypes = [
 ] as const;
 
 type AppRole = 'citizen' | 'worker';
+
+const MUMBAI_CENTER = { latitude: 19.076, longitude: 72.8777 };
 
 export default function App() {
   const [role, setRole] = useState<AppRole>('citizen');
@@ -345,7 +347,8 @@ export default function App() {
       const previousActive = await getLastWorkerAssignment();
       const nextActive = active?._id || null;
       if (nextActive && previousActive !== nextActive) {
-        await sendLocalNotification('New Assignment', `${active?.title || 'Incident assigned'}`);
+        const initLink = `civicresource://worker/initialize?incident=${nextActive}`;
+        await sendLocalNotification('New Assignment', `${active?.title || 'Incident assigned'}\n${t('assignmentInstruction')}\n${initLink}`);
       }
       await setLastWorkerAssignment(nextActive);
       return;
@@ -370,7 +373,8 @@ export default function App() {
       const previousActive = await getLastWorkerAssignment();
       const nextActive = data.activeIncident?._id || null;
       if (nextActive && previousActive !== nextActive) {
-        await sendLocalNotification('New Assignment', `${data.activeIncident?.title || 'Incident assigned'}`);
+        const initLink = `civicresource://worker/initialize?incident=${nextActive}`;
+        await sendLocalNotification('New Assignment', `${data.activeIncident?.title || 'Incident assigned'}\n${t('assignmentInstruction')}\n${initLink}`);
       }
       await setLastWorkerAssignment(nextActive);
     } catch {
@@ -388,7 +392,75 @@ export default function App() {
     }, 20000);
 
     return () => clearInterval(id);
-  }, [workerToken, workerUnitId, unitId]);
+  }, [workerToken, workerUnitId, unitId, language]);
+
+  const initializeWorkerRoute = async () => {
+    if (!workerToken || !workerActive?._id) {
+      Alert.alert('Action', 'No active assignment to initialize.');
+      return;
+    }
+
+    setWorkerLoading(true);
+    try {
+      const current = await getCurrentLocation();
+      if (!current) {
+        Alert.alert('Location', 'Please allow location permission to continue route tracking.');
+      }
+
+      await api.post(
+        '/dispatch/start-journey-simulation',
+        {
+          incidentId: workerActive._id,
+          intervalMinutes: 1,
+          timeScale: 0.1,
+          speedKmph: 32,
+        },
+        withAuthHeader(workerToken)
+      );
+
+      await sendLocalNotification('Route Initialized', t('routeInitialized'));
+      await loadWorkerAssignments();
+      Alert.alert('Route', t('routeInitialized'));
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Unable to initialize route right now.';
+      Alert.alert('Route', message);
+    } finally {
+      setWorkerLoading(false);
+    }
+  };
+
+  const resolveWorkerIncident = async () => {
+    if (!workerToken || !workerActive?._id) {
+      Alert.alert('Action', 'No active assignment to resolve.');
+      return;
+    }
+
+    setWorkerLoading(true);
+    try {
+      await api.put(`/incidents/${workerActive._id}/status`, { status: 'resolved' }, withAuthHeader(workerToken));
+      await sendLocalNotification('Incident Resolved', t('incidentResolved'));
+      await loadWorkerAssignments();
+      Alert.alert('Resolve', t('incidentResolved'));
+    } catch (err: any) {
+      const message = err?.response?.data?.message || 'Unable to resolve incident right now.';
+      Alert.alert('Resolve', message);
+    } finally {
+      setWorkerLoading(false);
+    }
+  };
+
+  const activeTracking = workerActive?.tracking?.currentLocation;
+  const destinationLat = Number(workerActive?.location?.lat);
+  const destinationLng = Number(workerActive?.location?.lng);
+  const sourceLat = Number.isFinite(Number(activeTracking?.lat)) ? Number(activeTracking?.lat) : Number.isFinite(destinationLat) ? destinationLat - 0.01 : MUMBAI_CENTER.latitude;
+  const sourceLng = Number.isFinite(Number(activeTracking?.lng)) ? Number(activeTracking?.lng) : Number.isFinite(destinationLng) ? destinationLng - 0.01 : MUMBAI_CENTER.longitude;
+  const hasWorkerRoute = Number.isFinite(destinationLat) && Number.isFinite(destinationLng);
+  const initializeLink = workerActive?._id ? `civicresource://worker/initialize?incident=${workerActive._id}` : '';
+  const resolveLink = workerActive?._id ? `civicresource://worker/resolve?incident=${workerActive._id}` : '';
+  const clusterInstruction =
+    workerActive?.clustering?.instructionByLanguage?.[language] ||
+    workerActive?.clustering?.instructionByLanguage?.english ||
+    (workerActive?.clustering?.clusterId ? t('clusterFallback') : '');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -523,11 +595,62 @@ export default function App() {
               <View style={styles.hudBox}>
                 <Text style={styles.incidentTitle}>{workerActive.title}</Text>
                 <Text style={styles.muted}>Severity: {workerActive.severity}</Text>
-                <Text style={styles.muted}>{t('status')}: {workerActive.status}</Text>
+                <Text style={styles.muted}>{t('assignmentStatus')}: {workerActive.dispatchStatus || workerActive.status}</Text>
                 <Text style={styles.muted}>Tracking: {workerActive.trackingId || '-'}</Text>
+
+                <View style={styles.actionCard}>
+                  <Text style={styles.actionCardTitle}>{t('assignmentAction')}</Text>
+                  <Text style={styles.actionCardHint}>{t('workerActionLinkHint')}</Text>
+                  <Text style={styles.actionInstruction}>{t('assignmentInstruction')}</Text>
+                  {workerActive?.clustering?.clusterId ? (
+                    <View style={styles.clusterCard}>
+                      <Text style={styles.clusterTitle}>{t('clusterInstructionTitle')}</Text>
+                      <Text style={styles.clusterText}>{clusterInstruction}</Text>
+                    </View>
+                  ) : null}
+
+                  <Pressable style={styles.linkBtn} onPress={initializeWorkerRoute} disabled={workerLoading}>
+                    <Text style={styles.linkBtnText}>{t('initializeRoute')}</Text>
+                    <Text style={styles.linkUrl}>{initializeLink}</Text>
+                  </Pressable>
+
+                  <Pressable style={styles.linkBtnSecondary} onPress={resolveWorkerIncident} disabled={workerLoading}>
+                    <Text style={styles.linkBtnSecondaryText}>{t('markResolved')}</Text>
+                    <Text style={styles.linkUrl}>{resolveLink}</Text>
+                  </Pressable>
+                </View>
+
+                <Text style={[styles.sectionTitle, { marginTop: 12 }]}>{t('routeMap')}</Text>
+                {hasWorkerRoute ? (
+                  <View style={styles.mapWrapper}>
+                    <MapView
+                      style={styles.map}
+                      region={{
+                        latitude: (sourceLat + destinationLat) / 2,
+                        longitude: (sourceLng + destinationLng) / 2,
+                        latitudeDelta: 0.03,
+                        longitudeDelta: 0.03,
+                      }}
+                    >
+                      <Polyline
+                        coordinates={[
+                          { latitude: sourceLat, longitude: sourceLng },
+                          { latitude: destinationLat, longitude: destinationLng },
+                        ]}
+                        strokeWidth={4}
+                        strokeColor="#2563eb"
+                      />
+                      <Marker coordinate={{ latitude: sourceLat, longitude: sourceLng }} title={t('source')} />
+                      <Marker coordinate={{ latitude: destinationLat, longitude: destinationLng }} title={t('destination')} />
+                    </MapView>
+                    <Text style={styles.mapHint}>{t('source')} → {t('destination')}</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.muted}>{t('noActiveAssignment')}</Text>
+                )}
               </View>
             ) : (
-              <Text style={styles.muted}>No active assignment.</Text>
+              <Text style={styles.muted}>{t('noActiveAssignment')}</Text>
             )}
 
             <Text style={[styles.sectionTitle, { marginTop: 16 }]}>{t('notifications')}</Text>
@@ -733,5 +856,78 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: '#f8fafc',
     gap: 3,
+  },
+  actionCard: {
+    marginTop: 10,
+    backgroundColor: '#fff7ed',
+    borderColor: '#fdba74',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 10,
+    gap: 8,
+  },
+  actionCardTitle: {
+    color: '#9a3412',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  actionCardHint: {
+    color: '#c2410c',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  actionInstruction: {
+    color: '#7c2d12',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '600',
+  },
+  clusterCard: {
+    backgroundColor: '#eff6ff',
+    borderColor: '#bfdbfe',
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 8,
+    gap: 2,
+  },
+  clusterTitle: {
+    color: '#1d4ed8',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  clusterText: {
+    color: '#1e3a8a',
+    fontSize: 11,
+    lineHeight: 16,
+    fontWeight: '600',
+  },
+  linkBtn: {
+    backgroundColor: '#0f172a',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  linkBtnText: {
+    color: '#ffffff',
+    fontWeight: '800',
+  },
+  linkBtnSecondary: {
+    backgroundColor: '#ffffff',
+    borderColor: '#0f172a',
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  linkBtnSecondaryText: {
+    color: '#0f172a',
+    fontWeight: '800',
+  },
+  linkUrl: {
+    color: '#94a3b8',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

@@ -81,7 +81,7 @@ const classifyIncidentFamily = (incident) => {
 const classifyResourceServiceFamily = (resource) => {
   const text = `${resource?.type || ''} ${resource?.name || ''}`.toLowerCase();
   if (/(garbage|trash|waste|sanitation|litter|dump)/.test(text)) return 'garbage';
-  if (/(water|tanker|pipe|hydrant|flood|drain|sewer)/.test(text)) return 'water';
+  if (/(water|tanker|pipe|pipeline|hydrant|wt-)/.test(text)) return 'water';
   if (/(road|pothole|maintenance|repair|utility|public_works|public works)/.test(text)) return 'maintenance';
   if (/(fire)/.test(text)) return 'fire';
   if (/(medical|ambulance)/.test(text)) return 'medical';
@@ -117,6 +117,86 @@ const incidentToPersonnelType = (incident) => {
   if (incidentType === 'sanitation' || need === 'garbage') return 'sanitation';
   return 'utility';
 };
+
+const severityDemandWeight = {
+  low: 1,
+  medium: 1.6,
+  high: 2.4,
+  critical: 3.2,
+};
+
+const incidentDemandEstimate = (incident, family) => {
+  const details = `${incident?.title || ''} ${incident?.details || ''}`.toLowerCase();
+  const severityFactor = severityDemandWeight[String(incident?.severity || 'medium').toLowerCase()] || 1.6;
+
+  if (family === 'water') {
+    const litersMatch = details.match(/(\d{2,5})\s*(l|lit|liter|litre|liters|litres)/i);
+    const liters = litersMatch ? Math.max(250, Math.min(12000, Number(litersMatch[1]))) : Math.round(900 * severityFactor);
+    return { units: liters, unitLabel: 'liters' };
+  }
+
+  if (family === 'garbage') {
+    const tonMatch = details.match(/(\d+(?:\.\d+)?)\s*(ton|tons|tonne|tonnes|t)/i);
+    const kgMatch = details.match(/(\d{2,5})\s*(kg|kilogram|kilograms)/i);
+    let wasteKg = Math.round(300 * severityFactor);
+    if (tonMatch) {
+      wasteKg = Math.round(Number(tonMatch[1]) * 1000);
+    } else if (kgMatch) {
+      wasteKg = Math.round(Number(kgMatch[1]));
+    }
+    return { units: Math.max(100, Math.min(9000, wasteKg)), unitLabel: 'kg' };
+  }
+
+  return { units: Math.max(1, Math.round(1 * severityFactor)), unitLabel: 'jobs' };
+};
+
+const canResourceServeFamily = (resource, family) => {
+  if (family === 'general') return true;
+  const resourceFamily = classifyResourceServiceFamily(resource);
+  if (resourceFamily === family) return true;
+  if (resourceFamily === 'general') {
+    // General-purpose units can support maintenance/general, not specialized water/garbage runs.
+    return family === 'maintenance';
+  }
+
+  const text = `${resource?.name || ''} ${resource?.type || ''}`.toLowerCase();
+  if (family === 'water') return /(water|tanker|pipeline|hydrant|wt-)/.test(text);
+  if (family === 'garbage') return /(garbage|waste|trash|sanitation)/.test(text);
+  if (family === 'maintenance') return /(road|repair|maintenance|utility|public_works|public works)/.test(text);
+  if (family === 'safety') return /(police|patrol|fire)/.test(text);
+  return false;
+};
+
+const resourceCapacityForFamily = (resource, family) => {
+  const caps = resource?.serviceCapabilities || {};
+  const text = `${resource?.name || ''} ${resource?.type || ''}`.toLowerCase();
+  const defaultWater = /(water|tanker)/.test(text) ? 9000 : 1800;
+  const defaultWaste = /(garbage|waste|trash)/.test(text) ? 4200 : 1200;
+  const waterCapRaw = safeNumber(caps.waterLitersCapacity, NaN);
+  const wasteCapRaw = safeNumber(caps.wasteKgCapacity, NaN);
+  const resolvedWaterCapacity = Number.isFinite(waterCapRaw) && waterCapRaw > 0 ? waterCapRaw : defaultWater;
+  const resolvedWasteCapacity = Number.isFinite(wasteCapRaw) && wasteCapRaw > 0 ? wasteCapRaw : defaultWaste;
+
+  return {
+    capacityUnits:
+      family === 'water'
+        ? Math.max(600, resolvedWaterCapacity)
+        : family === 'garbage'
+          ? Math.max(300, resolvedWasteCapacity)
+          : Math.max(1, safeNumber(caps.maxStopsPerTrip, 3)),
+    maxStops: Math.max(1, safeNumber(caps.maxStopsPerTrip, 3)),
+    serviceRadiusKm: Math.max(1, safeNumber(caps.serviceRadiusKm, 6)),
+    shiftRemainingMinutes: Math.max(20, safeNumber(caps.shiftRemainingMinutes, 240)),
+    crewSize: Math.max(1, safeNumber(caps.crewSize, 2)),
+    refillMinutes: Math.max(5, safeNumber(caps.refillMinutes, 20)),
+  };
+};
+
+const buildClusterInstruction = ({ clusterId, stopOrder, totalStops, family }) => ({
+  english: `Cluster ${clusterId}: stop ${stopOrder}/${totalStops}. Complete service and update GPS before proceeding to the next grouped complaint (${family}).`,
+  hindi: `क्लस्टर ${clusterId}: स्टॉप ${stopOrder}/${totalStops}. सेवा पूरी करें और अगली समूह शिकायत (${family}) पर जाने से पहले GPS अपडेट करें।`,
+  marathi: `क्लस्टर ${clusterId}: थांबा ${stopOrder}/${totalStops}. सेवा पूर्ण करा आणि पुढील गट तक्रारीकडे (${family}) जाण्यापूर्वी GPS अपडेट करा.`,
+});
 
 const distanceKm = (a, b) => {
   const lat1 = safeNumber(a?.lat, 19.076);
@@ -377,6 +457,134 @@ const postAI = async (endpoint, payload) => {
   return response.json();
 };
 
+const severityWeightScore = (severity) => ({ critical: 1, high: 0.8, medium: 0.55, low: 0.3 }[String(severity || '').toLowerCase()] || 0.5);
+
+const familyPriorityScore = (family) => ({ water: 0.95, garbage: 0.9, maintenance: 0.82, general: 0.68, safety: 0.78 }[String(family || '').toLowerCase()] || 0.7);
+
+const buildClusterFeasibilityPayload = (cluster, liveInputs = {}) => {
+  const incidents = Array.isArray(cluster?.incidents) ? cluster.incidents : [];
+  const capacity = cluster?.capacity || {};
+  const incidentCount = Math.max(1, incidents.length || safeNumber(capacity.plannedStops, 1));
+  const capacityUnits = Math.max(1, safeNumber(capacity.units, 1));
+  const demandUnits = Math.max(0, safeNumber(capacity.used, 0));
+  const utilizationPercent = Number.isFinite(Number(capacity.utilizationPercent))
+    ? Math.max(0, safeNumber(capacity.utilizationPercent, 0))
+    : (demandUnits / capacityUnits) * 100;
+  const avgDistanceKm = incidents.length
+    ? incidents.reduce((sum, incident) => sum + safeNumber(incident.distanceFromSeedKm, 0), 0) / incidents.length
+    : safeNumber(cluster?.radiusKm, 4);
+  const avgSeverityScore = incidents.length
+    ? incidents.reduce((sum, incident) => sum + severityWeightScore(incident.severity) * 100, 0) / incidents.length
+    : 50;
+  const mixedFamilyRatio = Math.max(0, Math.min(1, incidents.length > 1 ? incidents.filter((incident) => safeNumber(incident.demandUnits, 0) > 0).length / (incidentCount * 2) : 0.15));
+  const hasResource = Boolean(cluster?.assignment?.resource);
+  const hasPersonnel = Boolean(cluster?.assignment?.personnel);
+  const family = String(cluster?.serviceFamily || 'general').toLowerCase();
+  const familyMatchRatio = cluster?.assignment?.resource
+    ? family === 'water'
+      ? /water|tanker|drain|flood/i.test(String(cluster.assignment.resource.name || ''))
+        ? 1
+        : 0.45
+      : family === 'garbage'
+        ? /garbage|waste|trash|sanitation/i.test(String(cluster.assignment.resource.name || ''))
+          ? 1
+          : 0.4
+        : family === 'maintenance'
+          ? /road|repair|maintenance|public works|public_works/i.test(String(cluster.assignment.resource.name || ''))
+            ? 1
+            : 0.5
+          : 0.65
+    : hasPersonnel
+      ? 0.72
+      : 0.35;
+
+  return {
+    cluster_id: String(cluster?.clusterId || ''),
+    service_family: family,
+    incident_count: incidentCount,
+    capacity_units: capacityUnits,
+    demand_units: demandUnits,
+    utilization_percent: utilizationPercent,
+    avg_distance_km: avgDistanceKm,
+    avg_severity_score: avgSeverityScore,
+    mixed_family_ratio: mixedFamilyRatio,
+    available_personnel: hasPersonnel ? 1 : 0,
+    resource_available: hasResource,
+    shift_remaining_minutes: safeNumber(capacity.shiftRemainingMinutes, 120),
+    refill_minutes: safeNumber(capacity.refillMinutes, 20),
+    weather_rain_mm: safeNumber(liveInputs?.weather_rain_mm, 0),
+    traffic_index: safeNumber(liveInputs?.traffic_index, 1),
+    road_condition_index: safeNumber(liveInputs?.road_condition_index, 1),
+    family_match_ratio: familyMatchRatio,
+    crew_size: safeNumber(capacity.crewSize, hasPersonnel ? 2 : 1),
+    radius_km: safeNumber(cluster?.radiusKm, 4),
+    queue_pressure: Math.max(0, incidentCount - safeNumber(capacity.maxStops, incidentCount)) / Math.max(1, safeNumber(capacity.maxStops, incidentCount)),
+  };
+};
+
+const fallbackClusterFeasibilityScore = (cluster) => {
+  const capacity = cluster?.capacity || {};
+  const incidents = Array.isArray(cluster?.incidents) ? cluster.incidents : [];
+  const incidentCount = Math.max(1, incidents.length || safeNumber(capacity.plannedStops, 1));
+  const utilization = Number.isFinite(Number(capacity.utilizationPercent)) ? safeNumber(capacity.utilizationPercent, 0) : 0;
+  const underCapacity = Math.max(0, 100 - utilization) / 100;
+  const compactness = Math.max(0, 1 - safeNumber(cluster?.radiusKm, 4) / 10);
+  const familyScore = familyPriorityScore(cluster?.serviceFamily);
+  const resourceScore = cluster?.assignment?.resource ? 1 : 0.72;
+  const personnelScore = cluster?.assignment?.personnel ? 1 : 0.78;
+  const severityScore = incidents.length
+    ? incidents.reduce((sum, incident) => sum + severityWeightScore(incident.severity), 0) / incidents.length
+    : 0.5;
+
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      42 + familyScore * 18 + severityScore * 14 + underCapacity * 16 + compactness * 10 + resourceScore * 6 + personnelScore * 4 - Math.max(0, incidentCount - safeNumber(capacity.maxStops, incidentCount)) * 2
+    )
+  );
+
+  return {
+    feasibility_score: Number(score.toFixed(1)),
+    feasibility_probability: Number((score / 100).toFixed(3)),
+    source: 'heuristic-fallback',
+  };
+};
+
+const localClusterPriorityScore = (cluster, feasibilityScore) => {
+  const incidents = Array.isArray(cluster?.incidents) ? cluster.incidents : [];
+  const severityAvg = incidents.length ? incidents.reduce((sum, incident) => sum + severityWeightScore(incident.severity), 0) / incidents.length : 0.5;
+  const capacity = cluster?.capacity || {};
+  const utilization = Number.isFinite(Number(capacity.utilizationPercent)) ? safeNumber(capacity.utilizationPercent, 0) : 0;
+  const utilizationFit = utilization <= 100 ? 1 - utilization / 120 : Math.max(0, 1 - (utilization - 100) / 80);
+  const compactness = Math.max(0, 1 - safeNumber(cluster?.radiusKm, 4) / 10);
+  const familyScore = familyPriorityScore(cluster?.serviceFamily);
+  const resourceScore = cluster?.assignment?.resource ? 1 : 0.7;
+  const personnelScore = cluster?.assignment?.personnel ? 1 : 0.8;
+
+  return Math.max(
+    0,
+    Math.min(
+      100,
+      (feasibilityScore * 0.62) + (familyScore * 14) + (severityAvg * 10) + (utilizationFit * 9) + (compactness * 5) + (resourceScore * 3) + (personnelScore * 2)
+    )
+  );
+};
+
+const clusterDedupKey = (cluster) => {
+  const firstIncident = Array.isArray(cluster?.incidents) && cluster.incidents.length ? cluster.incidents[0] : null;
+  const lat = safeNumber(firstIncident?.location?.lat, 0);
+  const lng = safeNumber(firstIncident?.location?.lng, 0);
+  const geo = `${Math.round(lat * 100) / 100}_${Math.round(lng * 100) / 100}`;
+  return [
+    String(cluster?.serviceFamily || 'general'),
+    geo,
+    String(cluster?.assignment?.resource?.id || 'none'),
+    String(Math.round(safeNumber(cluster?.capacity?.units, 0))),
+    String(Math.round(safeNumber(cluster?.capacity?.used, 0))),
+  ].join('|');
+};
+
 // @desc    Dispatch personnel to an incident with a resource
 // @route   POST /api/dispatch/assign
 // @access  Private (Officer)
@@ -541,7 +749,7 @@ export const getWorkerAssignmentsByUnitId = async (req, res) => {
 
   try {
     const personnel = await Personnel.findOne({ 'contact.unitId': unitId })
-      .populate('currentIncident', 'title severity status dispatchStatus trackingId location createdAt updatedAt');
+      .populate('currentIncident', 'title severity status dispatchStatus trackingId location clustering createdAt updatedAt');
 
     if (!personnel) {
       return res.status(404).json({ message: 'Personnel unit not found' });
@@ -551,7 +759,7 @@ export const getWorkerAssignmentsByUnitId = async (req, res) => {
       $or: [{ assignedPersonnel: personnel._id }, { assignedPersonnelList: personnel._id }],
     })
       .sort({ updatedAt: -1 })
-      .select('title severity status dispatchStatus trackingId location tracking workflow createdAt updatedAt');
+      .select('title severity status dispatchStatus trackingId location tracking workflow clustering createdAt updatedAt');
 
     res.json({
       personnel: {
@@ -592,7 +800,7 @@ export const getMyAssignments = async (req, res) => {
     })
       .populate('assignedPersonnel', 'name type contact status location')
       .sort({ updatedAt: -1 })
-      .select('title severity status dispatchStatus type trackingId location details tracking workflow assignedPersonnel createdAt updatedAt');
+      .select('title severity status dispatchStatus type trackingId location details tracking workflow clustering assignedPersonnel createdAt updatedAt');
 
     res.json(incidents);
   } catch (error) {
@@ -1371,6 +1579,483 @@ export const applyPlanLive = async (req, res) => {
       summary: {
         appliedCount: applied.length,
         requested: maxAssignments,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Generate capacity-aware grouping recommendations
+// @route   POST /api/dispatch/group-clusters/recommend
+// @access  Private
+export const recommendGroupedClusters = async (req, res) => {
+  try {
+    const liveInputs = applyScenarioPreset(req.body?.liveInputs || {});
+    const radiusKm = Math.max(1, Math.min(10, safeNumber(req.body?.radiusKm, 4)));
+    const maxClusters = Math.max(1, Math.min(20, safeNumber(req.body?.maxClusters, 8)));
+    const minIncidentsPerCluster = Math.max(2, Math.min(5, safeNumber(req.body?.minIncidentsPerCluster, 2)));
+    const includeDispatched = String(req.body?.includeDispatched || 'false').toLowerCase() === 'true';
+
+    const incidents = await Incident.find({
+      status: { $ne: 'resolved' },
+      dispatchStatus: includeDispatched ? { $in: ['unassigned', 'dispatched', 'on-site', 'resolving'] } : 'unassigned',
+    }).sort({ createdAt: -1 });
+    const resources = await Resource.find({ status: { $nin: ['offline', 'maintenance'] } });
+    const availablePersonnel = await Personnel.find({ status: 'available' });
+
+    if (!incidents.length) {
+      return res.status(200).json({ clusters: [], summary: { candidates: 0, clusters: 0 } });
+    }
+
+    const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+    const sortedIncidents = [...incidents].sort((a, b) => {
+      const aFresh = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+      const bFresh = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      return (severityOrder[String(b?.severity)] || 0) - (severityOrder[String(a?.severity)] || 0) || (bFresh - aFresh);
+    });
+
+    const usedIncidentIds = new Set();
+    const clusters = [];
+    let clusterSequence = 1;
+
+    for (const seedIncident of sortedIncidents) {
+      if (clusters.length >= maxClusters) break;
+      const seedId = String(seedIncident._id);
+      if (usedIncidentIds.has(seedId)) continue;
+
+      const family = classifyIncidentFamily(seedIncident);
+      if (!['water', 'garbage', 'maintenance', 'general'].includes(family)) {
+        continue;
+      }
+
+      const candidateResources = resources
+        .filter((resource) => canResourceServeFamily(resource, family))
+        .sort((a, b) => distanceKm(a.location, seedIncident.location) - distanceKm(b.location, seedIncident.location));
+
+      const assignedResource = candidateResources[0] || null;
+      const capacityProfile = assignedResource
+        ? resourceCapacityForFamily(assignedResource, family)
+        : { capacityUnits: 1, maxStops: 1, serviceRadiusKm: radiusKm, shiftRemainingMinutes: 120, crewSize: 1, refillMinutes: 20 };
+
+      const clusterRadiusKm = Math.min(radiusKm, capacityProfile.serviceRadiusKm);
+      const familyIncidents = sortedIncidents
+        .filter((incident) => !usedIncidentIds.has(String(incident._id)))
+        .filter((incident) => classifyIncidentFamily(incident) === family)
+        .filter((incident) => distanceKm(seedIncident.location, incident.location) <= clusterRadiusKm)
+        .sort((a, b) => {
+          const aUnassigned = String(a?.dispatchStatus || '').toLowerCase() === 'unassigned' ? 1 : 0;
+          const bUnassigned = String(b?.dispatchStatus || '').toLowerCase() === 'unassigned' ? 1 : 0;
+          if (bUnassigned !== aUnassigned) return bUnassigned - aUnassigned;
+
+          const byDistance = distanceKm(seedIncident.location, a.location) - distanceKm(seedIncident.location, b.location);
+          if (Math.abs(byDistance) > 0.15) return byDistance;
+
+          const aFresh = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const bFresh = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          if (bFresh !== aFresh) return bFresh - aFresh;
+
+          return (severityOrder[String(b?.severity)] || 0) - (severityOrder[String(a?.severity)] || 0);
+        });
+
+      const selectedIncidents = [];
+      let totalDemand = 0;
+      let unitLabel = family === 'water' ? 'liters' : family === 'garbage' ? 'kg' : 'jobs';
+      let capacityOverrun = false;
+
+      for (const incident of familyIncidents) {
+        if (selectedIncidents.length >= capacityProfile.maxStops) break;
+
+        const demand = incidentDemandEstimate(incident, family);
+        unitLabel = demand.unitLabel;
+        const nextDemand = totalDemand + demand.units;
+        const canFitByCapacity = family === 'maintenance' || family === 'general' || nextDemand <= capacityProfile.capacityUnits;
+        if (!canFitByCapacity) {
+          capacityOverrun = true;
+          continue;
+        }
+
+        selectedIncidents.push({
+          incident,
+          demandUnits: demand.units,
+          distanceFromSeedKm: Number(distanceKm(seedIncident.location, incident.location).toFixed(2)),
+        });
+        totalDemand = nextDemand;
+      }
+
+      if (!selectedIncidents.length) {
+        const demand = incidentDemandEstimate(seedIncident, family);
+        if (family === 'water' || family === 'garbage') {
+          if (demand.units > capacityProfile.capacityUnits) {
+            capacityOverrun = true;
+            selectedIncidents.push({ incident: seedIncident, demandUnits: demand.units, distanceFromSeedKm: 0 });
+            totalDemand = demand.units;
+            unitLabel = demand.unitLabel;
+          } else {
+            selectedIncidents.push({ incident: seedIncident, demandUnits: demand.units, distanceFromSeedKm: 0 });
+            totalDemand = demand.units;
+            unitLabel = demand.unitLabel;
+          }
+        } else {
+          selectedIncidents.push({ incident: seedIncident, demandUnits: demand.units, distanceFromSeedKm: 0 });
+          totalDemand = demand.units;
+          unitLabel = demand.unitLabel;
+        }
+      }
+
+      if (selectedIncidents.length < minIncidentsPerCluster) {
+        // Not a real cluster yet: keep incidents unclaimed so they can combine with other seeds.
+        continue;
+      }
+
+      selectedIncidents.forEach((entry) => usedIncidentIds.add(String(entry.incident._id)));
+
+      const requiredPersonnelType = family === 'garbage' ? 'sanitation' : incidentToPersonnelType(seedIncident);
+      const assignedPersonnel = availablePersonnel
+        .filter((person) => String(person.type || '').toLowerCase() === requiredPersonnelType)
+        .sort((a, b) => {
+          const target = assignedResource?.location || seedIncident.location;
+          return distanceKm(a.location, target) - distanceKm(b.location, target);
+        })[0] || null;
+
+      const utilization = family === 'maintenance' || family === 'general'
+        ? (selectedIncidents.length / Math.max(1, capacityProfile.maxStops)) * 100
+        : (totalDemand / Math.max(1, capacityProfile.capacityUnits)) * 100;
+      capacityOverrun = capacityOverrun || (family !== 'maintenance' && family !== 'general' && utilization > 100);
+      const clusterId = `CL-${family.toUpperCase()}-${String(clusterSequence).padStart(3, '0')}`;
+      clusterSequence += 1;
+      const applyEligible = !capacityOverrun && (Boolean(assignedResource) || Boolean(assignedPersonnel));
+
+      clusters.push({
+        clusterId,
+        serviceFamily: family,
+        radiusKm: Number(clusterRadiusKm.toFixed(2)),
+        applyEligible,
+        capacityOverrun,
+        capacity: {
+          units: Math.round(capacityProfile.capacityUnits),
+          used: Math.round(totalDemand),
+          unitLabel,
+          utilizationPercent: Number(Math.min(150, utilization).toFixed(1)),
+          overCapacity: capacityOverrun,
+          maxStops: capacityProfile.maxStops,
+          plannedStops: selectedIncidents.length,
+          crewSize: capacityProfile.crewSize,
+          shiftRemainingMinutes: capacityProfile.shiftRemainingMinutes,
+          refillMinutes: capacityProfile.refillMinutes,
+        },
+        incidents: selectedIncidents.map((entry, index) => ({
+          id: String(entry.incident._id),
+          title: entry.incident.title,
+          severity: entry.incident.severity,
+          stopOrder: index + 1,
+          demandUnits: Math.round(entry.demandUnits),
+          demandUnitLabel: unitLabel,
+          distanceFromSeedKm: entry.distanceFromSeedKm,
+          location: entry.incident.location,
+          dispatchStatus: entry.incident.dispatchStatus,
+        })),
+        assignment: {
+          resource: assignedResource
+            ? {
+                id: String(assignedResource._id),
+                name: assignedResource.name,
+                type: assignedResource.type,
+                status: assignedResource.status,
+              }
+            : null,
+          personnel: assignedPersonnel
+            ? {
+                id: String(assignedPersonnel._id),
+                name: assignedPersonnel.name,
+                type: assignedPersonnel.type,
+                unitId: assignedPersonnel.contact?.unitId,
+              }
+            : null,
+        },
+        explainability: [
+          `${selectedIncidents.length} nearby complaint(s) within ${clusterRadiusKm.toFixed(1)} km grouped by ${family} service family.`,
+          `Capacity guardrails applied: ${Math.round(totalDemand)} / ${Math.round(capacityProfile.capacityUnits)} ${unitLabel}.`,
+          capacityOverrun
+            ? 'Cluster exceeds current unit capacity and is marked non-actionable until split or reassigned to higher-capacity resource.'
+            : 'Cluster is within capacity limits for direct apply.',
+          assignedResource
+            ? `Assigned ${assignedResource.name} due to nearest compatible service and active shift capacity.`
+            : 'No compatible resource currently online; personnel-only plan suggested.',
+        ],
+      });
+    }
+
+    const aiClusterPayload = clusters.map((cluster) => buildClusterFeasibilityPayload(cluster, liveInputs));
+    let feasibilityScores = [];
+    let clusterModelMeta = null;
+
+    try {
+      let response = await postAI('/analyze/grouping-feasibility', { clusters: aiClusterPayload });
+      const hasFallbackRows = Array.isArray(response?.clusters) && response.clusters.some((row) => String(row?.source || '') === 'heuristic-fallback');
+      const modelTrained = Boolean(response?.model?.trained);
+      if (hasFallbackRows && modelTrained) {
+        try {
+          await postAI('/model/train-clustering', {});
+          response = await postAI('/analyze/grouping-feasibility', { clusters: aiClusterPayload });
+        } catch (retrainError) {
+          // keep first response if retrain attempt fails
+        }
+      }
+      feasibilityScores = Array.isArray(response?.clusters) ? response.clusters : [];
+      clusterModelMeta = response?.model || null;
+    } catch (error) {
+      feasibilityScores = clusters.map((cluster) => ({
+        cluster_id: cluster.clusterId,
+        ...fallbackClusterFeasibilityScore(cluster),
+      }));
+    }
+
+    const aiScoreMap = new Map(
+      feasibilityScores.map((entry) => [String(entry.cluster_id || entry.clusterId || ''), entry])
+    );
+
+    const rankedClustersRaw = clusters
+      .map((cluster) => {
+        const aiScore = aiScoreMap.get(String(cluster.clusterId)) || fallbackClusterFeasibilityScore(cluster);
+        const feasibilityScore = safeNumber(aiScore.feasibility_score, 0);
+        const localPriorityScore = localClusterPriorityScore(cluster, feasibilityScore);
+        const finalScore = Math.min(100, Math.round((feasibilityScore * 0.72) + (localPriorityScore * 0.28)));
+
+        return {
+          ...cluster,
+          aiFeasibilityScore: Number(feasibilityScore.toFixed(1)),
+          aiFeasibilitySource: aiScore.source || 'heuristic-fallback',
+          feasibilityProbability: Number(safeNumber(aiScore.feasibility_probability, feasibilityScore / 100).toFixed(3)),
+          operationalPriorityScore: Number(localPriorityScore.toFixed(1)),
+          rankingScore: finalScore,
+          applyEligible: Boolean(cluster.applyEligible),
+          capacityOverrun: Boolean(cluster.capacityOverrun),
+          explainability: [
+            ...cluster.explainability,
+            `AI feasibility score: ${Number(feasibilityScore).toFixed(1)} / 100 (${(safeNumber(aiScore.feasibility_probability, feasibilityScore / 100) * 100).toFixed(0)}% probability).`,
+          ],
+        };
+      })
+      .sort((a, b) => Number(b.rankingScore || 0) - Number(a.rankingScore || 0));
+
+    const dedupeMap = new Map();
+    const rankedClusters = [];
+    for (const cluster of rankedClustersRaw) {
+      const shouldDedupe = cluster.applyEligible === false && cluster.capacityOverrun === true;
+      if (!shouldDedupe) {
+        rankedClusters.push(cluster);
+        continue;
+      }
+
+      const key = clusterDedupKey(cluster);
+      if (dedupeMap.has(key)) {
+        const existing = dedupeMap.get(key);
+        const existingIds = new Set((existing.incidents || []).map((incident) => String(incident.id || '')));
+        const mergedIncidents = [
+          ...(existing.incidents || []),
+          ...(cluster.incidents || []).filter((incident) => !existingIds.has(String(incident.id || ''))),
+        ];
+        existing.incidents = mergedIncidents;
+        existing.capacity.plannedStops = mergedIncidents.length;
+        existing.capacity.used = mergedIncidents.reduce((sum, incident) => sum + safeNumber(incident.demandUnits, 0), 0);
+        if (safeNumber(existing.capacity.units, 1) > 0 && !['maintenance', 'general'].includes(String(existing.serviceFamily || ''))) {
+          const util = (safeNumber(existing.capacity.used, 0) / safeNumber(existing.capacity.units, 1)) * 100;
+          existing.capacity.utilizationPercent = Number(Math.min(150, util).toFixed(1));
+        }
+        existing.explainability = [
+          `${mergedIncidents.length} nearby complaint(s) represented in this blocked cluster signature.`,
+          ...existing.explainability.slice(1),
+        ];
+        continue;
+      }
+
+      dedupeMap.set(key, cluster);
+      rankedClusters.push(cluster);
+    }
+
+    return res.status(200).json({
+      clusters: rankedClusters,
+      summary: {
+        candidates: incidents.length,
+        clusters: rankedClusters.length,
+        groupedIncidents: rankedClusters.reduce((sum, cluster) => sum + cluster.incidents.length, 0),
+        minIncidentsPerCluster,
+      },
+      parameters: { radiusKm, maxClusters, minIncidentsPerCluster, liveInputs },
+      filters: { includeDispatched },
+      message: rankedClusters.length
+        ? undefined
+        : `No multi-incident clusters found for current filters (minimum ${minIncidentsPerCluster} incidents per cluster).`,
+      model: clusterModelMeta,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Apply a grouped cluster plan to live dispatch
+// @route   POST /api/dispatch/group-clusters/apply
+// @access  Private
+export const applyGroupedClusterPlan = async (req, res) => {
+  try {
+    const cluster = req.body?.cluster;
+    const incidentIds = Array.isArray(cluster?.incidents)
+      ? cluster.incidents.map((incident) => String(incident?.id || incident?._id || '')).filter(Boolean)
+      : [];
+
+    if (!incidentIds.length) {
+      return res.status(400).json({ message: 'cluster.incidents is required to apply grouped plan' });
+    }
+
+    const incidents = await Incident.find({ _id: { $in: incidentIds }, status: { $ne: 'resolved' } });
+    if (!incidents.length) {
+      return res.status(404).json({ message: 'No active incidents found for this cluster plan' });
+    }
+
+    const incidentById = new Map(incidents.map((incident) => [String(incident._id), incident]));
+    const orderedIncidentRecords = incidentIds.map((id) => incidentById.get(String(id))).filter(Boolean);
+    const normalizedFamily = String(cluster?.serviceFamily || classifyIncidentFamily(orderedIncidentRecords[0])).toLowerCase();
+    const clusterId = String(cluster?.clusterId || `CL-${normalizedFamily.toUpperCase()}-${Date.now().toString(36).toUpperCase()}`);
+
+    if (cluster?.applyEligible === false || cluster?.capacityOverrun === true || safeNumber(cluster?.capacity?.utilizationPercent, 0) > 100) {
+      return res.status(400).json({
+        message: 'Cluster is over capacity or marked non-actionable. Split or re-plan before apply.',
+      });
+    }
+
+    let resource = null;
+    const resourceId = String(cluster?.assignment?.resource?.id || cluster?.resourceId || '').trim();
+    if (resourceId) {
+      resource = await Resource.findById(resourceId);
+    }
+
+    let personnel = null;
+    const personnelId = String(cluster?.assignment?.personnel?.id || cluster?.personnelId || '').trim();
+    if (personnelId) {
+      personnel = await Personnel.findById(personnelId);
+    }
+
+    if (!personnel) {
+      const requiredType = normalizedFamily === 'garbage' ? 'sanitation' : incidentToPersonnelType(orderedIncidentRecords[0]);
+      personnel = await Personnel.findOne({ status: 'available', type: requiredType }).sort({ updatedAt: 1 });
+    }
+
+    if ((normalizedFamily === 'water' || normalizedFamily === 'garbage') && !resource) {
+      return res.status(400).json({
+        message: `A compatible ${normalizedFamily} resource is required before applying this grouped plan.`,
+      });
+    }
+
+    if (resource && !canResourceServeFamily(resource, normalizedFamily)) {
+      return res.status(400).json({
+        message: `Selected resource ${resource.name} is not compatible with ${normalizedFamily} cluster demand.`,
+      });
+    }
+
+    if (resource && (normalizedFamily === 'water' || normalizedFamily === 'garbage')) {
+      const capacityProfile = resourceCapacityForFamily(resource, normalizedFamily);
+      const totalDemandUnits = orderedIncidentRecords.reduce((sum, incident) => {
+        const demand = incidentDemandEstimate(incident, normalizedFamily);
+        return sum + demand.units;
+      }, 0);
+
+      if (totalDemandUnits > capacityProfile.capacityUnits) {
+        return res.status(400).json({
+          message: `Cluster demand ${Math.round(totalDemandUnits)} exceeds resource capacity ${Math.round(capacityProfile.capacityUnits)}. Split cluster or choose higher-capacity unit.`,
+        });
+      }
+    }
+
+    const now = new Date();
+    const applied = [];
+    const allIds = orderedIncidentRecords.map((incident) => String(incident._id));
+
+    for (let i = 0; i < orderedIncidentRecords.length; i += 1) {
+      const incident = orderedIncidentRecords[i];
+      const incidentId = String(incident._id);
+      const demand = incidentDemandEstimate(incident, normalizedFamily);
+
+      incident.dispatchStatus = 'dispatched';
+      if (incident.status === 'resolved') {
+        incident.status = 'active';
+      }
+
+      incident.workflow = incident.workflow || {};
+      if (!incident.workflow.allocatedAt) incident.workflow.allocatedAt = now;
+      if (!incident.workflow.enRouteAt) incident.workflow.enRouteAt = now;
+
+      incident.assignedResources = incident.assignedResources || [];
+      if (resource && !incident.assignedResources.map((id) => String(id)).includes(String(resource._id))) {
+        incident.assignedResources.push(resource._id);
+      }
+
+      if (personnel) {
+        incident.assignedPersonnel = personnel._id;
+        incident.assignedPersonnelList = incident.assignedPersonnelList || [];
+        if (!incident.assignedPersonnelList.map((id) => String(id)).includes(String(personnel._id))) {
+          incident.assignedPersonnelList.push(personnel._id);
+        }
+      }
+
+      incident.clustering = {
+        clusterId,
+        serviceFamily: normalizedFamily,
+        stopOrder: i + 1,
+        totalStops: orderedIncidentRecords.length,
+        estimatedDemandUnits: demand.units,
+        demandUnitLabel: demand.unitLabel,
+        groupedWith: allIds.filter((id) => id !== incidentId),
+        instructionByLanguage: buildClusterInstruction({
+          clusterId,
+          stopOrder: i + 1,
+          totalStops: orderedIncidentRecords.length,
+          family: normalizedFamily,
+        }),
+        plannedAt: now,
+      };
+
+      await incident.save();
+      applied.push({
+        incidentId,
+        title: incident.title,
+        stopOrder: i + 1,
+        totalStops: orderedIncidentRecords.length,
+      });
+    }
+
+    if (resource) {
+      resource.status = 'dispatched';
+      resource.currentIncident = orderedIncidentRecords[0]._id;
+      if (personnel) {
+        resource.assignedPersonnel = personnel._id;
+      }
+      await resource.save();
+    }
+
+    if (personnel) {
+      personnel.status = 'busy';
+      personnel.currentIncident = orderedIncidentRecords[0]._id;
+      if (resource) {
+        personnel.assignedResource = resource._id;
+      }
+
+      const queueIds = orderedIncidentRecords.slice(1).map((incident) => String(incident._id));
+      personnel.taskQueue = Array.from(new Set([...(personnel.taskQueue || []).map((id) => String(id)), ...queueIds]));
+      await personnel.save();
+    }
+
+    return res.status(200).json({
+      message: `Applied grouped cluster ${clusterId} to ${applied.length} incident(s)`,
+      clusterId,
+      applied,
+      assignment: {
+        resource: resource
+          ? { id: String(resource._id), name: resource.name, type: resource.type }
+          : null,
+        personnel: personnel
+          ? { id: String(personnel._id), name: personnel.name, unitId: personnel.contact?.unitId }
+          : null,
       },
     });
   } catch (error) {

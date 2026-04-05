@@ -16,6 +16,7 @@ import {
   Truck,
   ShieldAlert,
   RefreshCw,
+  Layers3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -31,6 +32,7 @@ const workerNavItems = [
 const adminNavItems = [
   { to: "/app", label: "Strategic Map", icon: LayoutGrid },
   { to: "/app/dispatch", label: "Live Dispatch", icon: Send },
+  { to: "/app/clusters", label: "Cluster Ops", icon: Layers3 },
   { to: "/app/archive", label: "Incident Archive", icon: Archive },
   { to: "/app/intelligence", label: "Intelligence Matrix", icon: Activity },
   { to: "/app/escalation", label: "Governance Matrix", icon: ShieldAlert },
