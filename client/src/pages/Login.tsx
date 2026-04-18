@@ -111,13 +111,6 @@ export default function Login() {
                >
                   {loading ? <Activity className="w-5 h-5 animate-spin" /> : <>Finalize Sync <ArrowRight className="w-5 h-5" /></>}
                </button>
-
-               <Link
-                  to="/signup"
-                  className="block w-full py-5 rounded-2xl border border-border/40 bg-white text-slate-700 text-[10px] text-center font-black uppercase tracking-[0.3em] hover:border-primary hover:text-primary transition-all"
-               >
-                  Request Staff Signup
-               </Link>
             </form>
 
             <div className="mt-16 pt-12 border-t border-slate-50 flex flex-col gap-6">

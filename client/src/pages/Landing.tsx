@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { ArrowRight, Globe2, Search, FileText, UserPlus } from "lucide-react";
+import { ArrowRight, Globe2, Search, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { BrandMark } from "@/components/BrandMark";
@@ -108,9 +108,6 @@ export default function Landing() {
           <div className="pt-6 border-t border-border/40 flex flex-wrap items-center gap-4">
             <Link to="/login" className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 hover:text-slate-900 transition-colors">
               {text.staff}
-            </Link>
-            <Link to="/signup" className="text-[10px] font-black uppercase tracking-[0.3em] text-primary hover:text-slate-900 transition-colors flex items-center gap-2">
-              <UserPlus className="w-4 h-4" /> {text.signup}
             </Link>
           </div>
         </motion.section>
